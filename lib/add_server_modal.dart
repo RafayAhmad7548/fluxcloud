@@ -1,5 +1,7 @@
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fluxcloud/user.dart';
 
 class AddServerModal extends StatefulWidget {
   const AddServerModal({
@@ -20,6 +22,7 @@ class _AddServerModalState extends State<AddServerModal> {
   bool _fileSelected = false;
   bool _showPassword = false;
 
+  final Connection _connection = Connection();
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +41,7 @@ class _AddServerModalState extends State<AddServerModal> {
                 spacing: 16,
                 children: [
                   Text(
-                    'Add Server',
+                    'Add Connection',
                     textAlign: TextAlign.left,
                     style: TextStyle(fontSize: 18),
                   ),
@@ -46,7 +49,16 @@ class _AddServerModalState extends State<AddServerModal> {
                     decoration: InputDecoration(
                       labelText: 'Host',
                     ),
-                    validator: (value) => value == null || value.isEmpty ? 'This value is required' : null
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'This value is required';
+                      }
+                      if (!RegExp(r'^(([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})|(\d{1,3}(\.\d{1,3}){3})$').hasMatch(value)) {
+                        return 'Please enter a valid host';
+                      }
+                      return null;
+                    },
+                    onSaved: (value) => _connection.host = value,
                   ),
                   TextFormField(
                     keyboardType: TextInputType.number,
@@ -61,22 +73,25 @@ class _AddServerModalState extends State<AddServerModal> {
                         return 'Please enter a valid port';
                       }
                       return null;
-                    }
+                    },
+                    onSaved: (value) => _connection.port = int.parse(value!),
                   ),
                   TextFormField(
                     decoration: InputDecoration(
                       labelText: 'Username',
                     ),
-                    validator: (value) => value == null || value.isEmpty ? 'This value is required' : null
+                    validator: (value) => value == null || value.isEmpty ? 'This value is required' : null,
+                    onSaved: (value) => _connection.username = value,
                   ),
                   TextFormField(
                     controller: _privateKeyFileController,
                     readOnly: true,
                     onTap: () async {
-                      FilePickerResult? result = await FilePicker.platform.pickFiles();
+                      final XFile? result = await openFile();
                       if (result != null) {
                         setState(() => _fileSelected = true);
-                        _privateKeyFileController.text = result.files.single.name;
+                        _privateKeyFileController.text = result.name;
+                        _connection.privateKeyFilePath = result.path;
                       }
                     },
                     decoration: InputDecoration(
@@ -112,13 +127,23 @@ class _AddServerModalState extends State<AddServerModal> {
                         return 'At least provide one of these';
                       }
                       return null;
-                    }
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      _formKey.currentState?.validate();
                     },
-                    child: Text('Submit')
+                    onSaved: (value) => _connection.password = value,
+                  ),
+                  
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (_formKey.currentState?.validate() == true) {
+                        _formKey.currentState?.save();
+                        assert(_connection.assertComplete());
+                        final storage = FlutterSecureStorage();
+                        await storage.write(key: _connection.host!, value: _connection.toJson);
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      }
+                    },
+                    child: Text('Add Connection')
                   )
                 ],
               )
