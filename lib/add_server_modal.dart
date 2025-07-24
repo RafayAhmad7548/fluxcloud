@@ -1,12 +1,15 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:fluxcloud/user.dart';
+import 'package:fluxcloud/connection.dart';
 
 class AddServerModal extends StatefulWidget {
   const AddServerModal({
-    super.key,
+    super.key, required this.updateConnectionList, this.initialState,
   });
+
+  final Function updateConnectionList;
+  final Connection? initialState;
 
   @override
   State<AddServerModal> createState() => _AddServerModalState();
@@ -21,8 +24,22 @@ class _AddServerModalState extends State<AddServerModal> {
   
   bool _fileSelected = false;
   bool _showPassword = false;
+  bool _showPrivateKey = false;
+  bool _isPrivateKeyValid = false;
 
   final Connection _connection = Connection();
+
+
+  @override
+    void initState() {
+      super.initState();
+      if (widget.initialState != null) {
+        _connection.isEncryptionEnabled = widget.initialState?.isEncryptionEnabled;
+        _connection.isDefault = widget.initialState?.isDefault;
+        _privateKeyFileController.text = widget.initialState?.privateKey ?? '';
+        _passwordController.text = widget.initialState?.password ?? '';
+      }
+    }
 
   @override
   Widget build(BuildContext context) {
@@ -41,11 +58,12 @@ class _AddServerModalState extends State<AddServerModal> {
                 spacing: 16,
                 children: [
                   Text(
-                    'Add Connection',
+                    widget.initialState == null ? 'Add Connection' : 'Edit Connection',
                     textAlign: TextAlign.left,
                     style: TextStyle(fontSize: 18),
                   ),
                   TextFormField(
+                    initialValue: widget.initialState?.host,
                     decoration: InputDecoration(
                       labelText: 'Host',
                     ),
@@ -61,6 +79,7 @@ class _AddServerModalState extends State<AddServerModal> {
                     onSaved: (value) => _connection.host = value,
                   ),
                   TextFormField(
+                    initialValue: widget.initialState?.port.toString(),
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       labelText: 'Port',
@@ -77,6 +96,7 @@ class _AddServerModalState extends State<AddServerModal> {
                     onSaved: (value) => _connection.port = int.parse(value!),
                   ),
                   TextFormField(
+                    initialValue: widget.initialState?.username,
                     decoration: InputDecoration(
                       labelText: 'Username',
                     ),
@@ -85,29 +105,68 @@ class _AddServerModalState extends State<AddServerModal> {
                   ),
                   TextFormField(
                     controller: _privateKeyFileController,
+                    obscureText: !_showPrivateKey,
                     readOnly: true,
                     onTap: () async {
-                      final XFile? result = await openFile();
-                      if (result != null) {
-                        setState(() => _fileSelected = true);
-                        _privateKeyFileController.text = result.name;
-                        _connection.privateKeyFilePath = result.path;
+                      final XFile? file = await openFile();
+                      if (file != null) {
+                        const knownHeaders = [
+                          '-----BEGIN OPENSSH PRIVATE KEY-----',
+                          '-----BEGIN RSA PRIVATE KEY-----',
+                          '-----BEGIN DSA PRIVATE KEY-----',
+                          '-----BEGIN EC PRIVATE KEY-----',
+                          '-----BEGIN PRIVATE KEY-----',
+                        ];
+                        try {
+                          final privateKey = await file.readAsString();
+                          if (knownHeaders.any((h) => privateKey.startsWith(h))) {
+                            setState(() {
+                              _fileSelected = true;
+                              _showPrivateKey = false;
+                              _privateKeyFileController.text = privateKey;
+                            });
+                            _isPrivateKeyValid = true;
+                            _connection.privateKey = privateKey;
+                          }
+                          else {
+                            _isPrivateKeyValid = false;
+                          }
+                        }
+                        catch (e) {
+                          setState(() {
+                            _fileSelected = true;
+                            _showPrivateKey = true;
+                            _privateKeyFileController.text = 'Invalid private key file';
+                          });
+                          _isPrivateKeyValid = false;
+                        }
                       }
                     },
                     decoration: InputDecoration(
                       labelText: 'Private Key File',
-                      suffixIcon: _fileSelected ? IconButton(
-                        onPressed: () => setState(() { 
-                          _fileSelected = false;
-                          _privateKeyFileController.clear();
-                        }),
-                        icon: Icon(Icons.remove)
+                      suffixIcon: _fileSelected ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: () => setState(() => _showPrivateKey = !_showPrivateKey),
+                            icon: _showPrivateKey ? Icon(Icons.visibility) : Icon(Icons.visibility_off)
+                          ),
+                          IconButton(
+                            onPressed: () => setState(() { 
+                              _fileSelected = false;
+                              _privateKeyFileController.clear();
+                            }),
+                            icon: Icon(Icons.remove)
+                          ),
+                        ],
                       ) : null
                     ),
                     validator: (value) {
-                      // TODO: validate the file to see if it is valid private key
                       if (_privateKeyFileController.text.isEmpty && _passwordController.text.isEmpty) {
                         return 'At least provide one of these';
+                      }
+                      if (!_isPrivateKeyValid) {
+                        return 'Invalid private key file';
                       }
                       return null;
                     }
@@ -130,7 +189,18 @@ class _AddServerModalState extends State<AddServerModal> {
                     },
                     onSaved: (value) => _connection.password = value,
                   ),
-                  
+                  CheckboxListTile(
+                    title: Text('Enable Encryption'),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(10)),
+                    value: _connection.isEncryptionEnabled ?? true,
+                    onChanged: (value) => setState(() => _connection.isEncryptionEnabled = value),
+                  ),
+                  CheckboxListTile(
+                    title: Text('Set as Default Connection'),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(10)),
+                    value: _connection.isDefault ?? false,
+                    onChanged: (value) => setState(() => _connection.isDefault = value),
+                  ),
                   ElevatedButton(
                     onPressed: () async {
                       if (_formKey.currentState?.validate() == true) {
@@ -138,12 +208,13 @@ class _AddServerModalState extends State<AddServerModal> {
                         assert(_connection.assertComplete());
                         final storage = FlutterSecureStorage();
                         await storage.write(key: _connection.host!, value: _connection.toJson);
+                        widget.updateConnectionList();
                         if (context.mounted) {
                           Navigator.pop(context);
                         }
                       }
                     },
-                    child: Text('Add Connection')
+                    child: Text(widget.initialState == null ? 'Add Connection' : 'Save')
                   )
                 ],
               )

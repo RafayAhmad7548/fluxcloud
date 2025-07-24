@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fluxcloud/add_server_modal.dart';
+import 'package:fluxcloud/sftp_connection_list.dart';
 
 void main() {
   runApp(const MainApp());
@@ -23,26 +23,7 @@ class MainApp extends StatelessWidget {
       ),
       themeMode: ThemeMode.system,
       color: Color(0x002EC1EB),
-      home: Scaffold(
-        floatingActionButton: Builder(
-          builder: (context) {
-            return FloatingActionButton(
-              child: Icon(Icons.add),
-              onPressed: () {
-                showModalBottomSheet(
-                  isScrollControlled: true,
-                  context: context, 
-                  showDragHandle: true,
-                  builder: (context) => AddServerModal()
-                );
-              }
-            );
-          }
-        ),
-        body: Center(
-          child: Text('nice World!'),
-        ),
-      ),
+      home: SftpConnectionList()
     );
   }
 }
