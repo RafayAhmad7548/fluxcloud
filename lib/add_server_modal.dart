@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -118,7 +120,7 @@ class _AddServerModalState extends State<AddServerModal> {
                           '-----BEGIN PRIVATE KEY-----',
                         ];
                         try {
-                          final privateKey = await file.readAsString();
+                          final privateKey = utf8.decode(await file.readAsBytes());
                           if (knownHeaders.any((h) => privateKey.startsWith(h))) {
                             setState(() {
                               _fileSelected = true;
@@ -133,6 +135,7 @@ class _AddServerModalState extends State<AddServerModal> {
                           }
                         }
                         catch (e) {
+                          print('bonga');
                           setState(() {
                             _fileSelected = true;
                             _showPrivateKey = true;
