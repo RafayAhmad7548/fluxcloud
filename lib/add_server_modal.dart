@@ -39,7 +39,10 @@ class _AddServerModalState extends State<AddServerModal> {
         _connection.isEncryptionEnabled = widget.initialState?.isEncryptionEnabled;
         _connection.isDefault = widget.initialState?.isDefault;
         _privateKeyFileController.text = widget.initialState?.privateKey ?? '';
+        _connection.privateKey = widget.initialState?.privateKey;
         _passwordController.text = widget.initialState?.password ?? '';
+        _fileSelected = true;
+        _isPrivateKeyValid = true;
       }
     }
 
@@ -135,7 +138,6 @@ class _AddServerModalState extends State<AddServerModal> {
                           }
                         }
                         catch (e) {
-                          print('bonga');
                           setState(() {
                             _fileSelected = true;
                             _showPrivateKey = true;
@@ -168,7 +170,7 @@ class _AddServerModalState extends State<AddServerModal> {
                       if (_privateKeyFileController.text.isEmpty && _passwordController.text.isEmpty) {
                         return 'At least provide one of these';
                       }
-                      if (!_isPrivateKeyValid) {
+                      if (_privateKeyFileController.text.isNotEmpty && !_isPrivateKeyValid) {
                         return 'Invalid private key file';
                       }
                       return null;
