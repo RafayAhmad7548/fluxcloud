@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:fluxcloud/add_server_modal.dart';
 import 'package:fluxcloud/connection.dart';
 import 'package:fluxcloud/sftp_explorer.dart';
+import 'package:fluxcloud/widgets/add_server_modal.dart';
 
 class SftpConnectionList extends StatefulWidget {
   const SftpConnectionList({
