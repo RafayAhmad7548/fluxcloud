@@ -157,23 +157,13 @@ class _SftpExplorerState extends State<SftpExplorer> {
                         await widget.sftpClient.mkdir('${widget.path}${nameController.text}');
                         _listDir();
                       }
-                        on SftpStatusError catch (e) {
+                      on SftpStatusError catch (e) {
                         if (context.mounted) {
                           if (e.code == 4) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                behavior: SnackBarBehavior.floating,
-                                content: Text('Folder Already Exists')
-                              )
-                            );
+                            ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Folder Already Exists'));
                           }
                           else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                behavior: SnackBarBehavior.floating,
-                                content: Text('Error: ${e.message}')
-                              )
-                            );
+                            ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Error: ${e.message}'));
                           }
                         }
                       }
@@ -194,24 +184,50 @@ class _SftpExplorerState extends State<SftpExplorer> {
           onPressed: () async {
             final List<XFile> files = await openFiles();
             for (XFile file in files) {
-              final remoteFile = await widget.sftpClient.open('${widget.path}${file.name}', mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.exclusive);
-              final fileSize = await file.length();
-              final uploader = remoteFile.write(
-                file.openRead().cast(),
-                onProgress: (progress) => setState(() => _progress = progress/fileSize)
-              );
-              setState(() {
-                _loader = uploader;
-                _loadingFileName = file.name;
-              });
-              await uploader.done;
+              try {
+                final remoteFile = await widget.sftpClient.open('${widget.path}${file.name}', mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.exclusive);
+                final fileSize = await file.length();
+                final uploader = remoteFile.write(
+                  file.openRead().cast(),
+                  onProgress: (progress) => setState(() => _progress = progress/fileSize)
+                );
+                setState(() {
+                  _loader = uploader;
+                  _loadingFileName = file.name;
+                });
+                await uploader.done;
+                setState(() => _loader = null);
+                _listDir();
+              }
+              on SftpStatusError catch (e) {
+                if (context.mounted) {
+                  if (e.code == 4) {
+                    ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'File Already Exists'));
+                  }
+                  else {
+                    ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Error: ${e.message}'));
+                  }
+                }
+              }
             }
-            setState(() => _loader = null);
-            _listDir();
           },
           child: Icon(Icons.upload),
         ),
       ],
+    );
+  }
+
+  SnackBar _buildErrorSnackBar(BuildContext context, String error) {
+    return SnackBar(
+      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+      behavior: SnackBarBehavior.floating,
+      content: Row(
+        spacing: 10,
+        children: [
+          Icon(Icons.error, color: Colors.red,),
+          Text(error, style: TextStyle(color: Theme.of(context).colorScheme.onSecondaryContainer),),
+        ],
+      )
     );
   }
 
