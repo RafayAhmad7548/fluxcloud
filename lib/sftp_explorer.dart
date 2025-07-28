@@ -65,7 +65,44 @@ class _SftpExplorerState extends State<SftpExplorer> {
                   icon: Icon(Icons.copy)
                 ),
                 IconButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    final newNameController = TextEditingController(text: dirEntry.filename);
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Rename'),
+                        content: TextField(
+                          controller: newNameController,
+                          autofocus: true,
+                          decoration: InputDecoration(
+                            labelText: 'Enter new name'
+                          ),
+                        ),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+                          TextButton(
+                            onPressed: () async {
+                              try {
+                                await widget.sftpClient.rename('${widget.path}${dirEntry.filename}', '${widget.path}${newNameController.text}');
+                                _listDir();
+                              }
+                              on SftpStatusError catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.message));
+                                }
+                              }
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                              }
+
+                            },
+                            child: Text('Rename')
+                          ),
+
+                        ],
+                      )
+                    );
+                  },
                   icon: Icon(Icons.drive_file_rename_outline)
                 ),
                 IconButton(
@@ -182,9 +219,10 @@ class _SftpExplorerState extends State<SftpExplorer> {
         FloatingActionButton(
           heroTag: 'upload-file',
           onPressed: () async {
+            // TODO: upload hangingig on android
             final List<XFile> files = await openFiles();
-            for (XFile file in files) {
-              try {
+            try {
+              for (XFile file in files) {
                 final remoteFile = await widget.sftpClient.open('${widget.path}${file.name}', mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.exclusive);
                 final fileSize = await file.length();
                 final uploader = remoteFile.write(
@@ -196,17 +234,17 @@ class _SftpExplorerState extends State<SftpExplorer> {
                   _loadingFileName = file.name;
                 });
                 await uploader.done;
-                setState(() => _loader = null);
-                _listDir();
               }
-              on SftpStatusError catch (e) {
-                if (context.mounted) {
-                  if (e.code == 4) {
-                    ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'File Already Exists'));
-                  }
-                  else {
-                    ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Error: ${e.message}'));
-                  }
+              setState(() => _loader = null);
+              _listDir();
+            }
+            on SftpStatusError catch (e) {
+              if (context.mounted) {
+                if (e.code == 4) {
+                  ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'File Already Exists'));
+                }
+                else {
+                  ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Error: ${e.message}'));
                 }
               }
             }
