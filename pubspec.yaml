@@ -12,6 +12,8 @@ dependencies:
   file_selector: ^1.0.3
   flutter_secure_storage: ^9.2.4
   dartssh2: ^2.13.0
+  path: ^1.9.1
+  file_picker: ^10.2.0
 
 dev_dependencies:
   flutter_test:

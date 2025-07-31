@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fluxcloud/connection.dart';
 import 'package:fluxcloud/sftp_explorer.dart';
+import 'package:fluxcloud/sftp_worker.dart';
 import 'package:fluxcloud/widgets/add_server_modal.dart';
 
 class SftpConnectionList extends StatefulWidget {
@@ -78,19 +78,9 @@ class _SftpConnectionListState extends State<SftpConnectionList> {
                     borderRadius: BorderRadius.circular(10),
                     child: InkWell(
                       onTap: () async {
-                        final conn = _connections[index];
-                        final client = SSHClient(
-                          await SSHSocket.connect(conn.host!, conn.port!),
-                          username: conn.username!,
-                          onPasswordRequest: () => conn.password,
-                          identities: [
-                            if (conn.privateKey != null)
-                              ...SSHKeyPair.fromPem(conn.privateKey!)
-                          ]
-                        );
-                        final sftpClient = await client.sftp();
+                        final sftpWorker = await SftpWorker.spawn(_connections[index]);
                         if (context.mounted) {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => SftpExplorer(sftpClient: sftpClient,)));
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => SftpExplorer(sftpWorker: sftpWorker,)));
                         }
                       },
                       borderRadius: BorderRadius.circular(10),

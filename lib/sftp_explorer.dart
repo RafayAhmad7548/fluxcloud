@@ -1,11 +1,15 @@
+import 'dart:io';
+
 import 'package:dartssh2/dartssh2.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:fluxcloud/sftp_worker.dart';
 
 class SftpExplorer extends StatefulWidget {
-  const SftpExplorer({super.key, required this.sftpClient, this.path = '/'});
+  const SftpExplorer({super.key, required this.sftpWorker, this.path = '/'});
 
-  final SftpClient sftpClient;
+  final SftpWorker sftpWorker;
   final String path;
 
   @override
@@ -17,10 +21,6 @@ class _SftpExplorerState extends State<SftpExplorer> {
   bool _isLoading = true;
   late List<SftpName> _dirContents;
   
-  SftpFileWriter? _loader;
-  String _loadingFileName = '';
-  double _progress = 0;
-
   @override
   void initState() {
     super.initState();
@@ -29,7 +29,14 @@ class _SftpExplorerState extends State<SftpExplorer> {
 
   Future<void> _listDir() async {
     setState(() => _isLoading = true);
-    _dirContents =  await widget.sftpClient.listdir(widget.path);
+    try {
+      _dirContents =  await widget.sftpWorker.listdir(widget.path);
+    }
+    catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.toString()));
+      }
+    }
     setState(() => _isLoading = false);
   }
 
@@ -40,7 +47,6 @@ class _SftpExplorerState extends State<SftpExplorer> {
       appBar: AppBar(
         title: Text('Explorer'),
       ),
-      bottomNavigationBar: _buildLoadingWidget(context), 
       floatingActionButton: _buildFABs(context),
       body: _isLoading ? Center(child: CircularProgressIndicator()) : ListView.builder(
         itemCount: _dirContents.length,
@@ -82,19 +88,19 @@ class _SftpExplorerState extends State<SftpExplorer> {
                           TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
                           TextButton(
                             onPressed: () async {
-                              try {
-                                await widget.sftpClient.rename('${widget.path}${dirEntry.filename}', '${widget.path}${newNameController.text}');
-                                _listDir();
-                              }
-                              on SftpStatusError catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.message));
-                                }
-                              }
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                              }
-
+                              // try {
+                              //   await widget.sftpWorker.rename('${widget.path}${dirEntry.filename}', '${widget.path}${newNameController.text}');
+                              //   _listDir();
+                              // }
+                              // on SftpStatusError catch (e) {
+                              //   if (context.mounted) {
+                              //     ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.message));
+                              //   }
+                              // }
+                              // if (context.mounted) {
+                              //   Navigator.pop(context);
+                              // }
+                              //
                             },
                             child: Text('Rename')
                           ),
@@ -116,30 +122,30 @@ class _SftpExplorerState extends State<SftpExplorer> {
                           TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
                           TextButton(
                             onPressed: () async {
-                              if (dirEntry.attr.isDirectory) {
-                                Future<void> removeRecursively (String path) async {
-                                  final dirContents = await widget.sftpClient.listdir(path);
-                                  for (SftpName entry in dirContents) {
-                                    final fullPath = '$path${entry.filename}';
-                                    if (entry.attr.isDirectory) {
-                                      await removeRecursively('$fullPath/');
-                                      await widget.sftpClient.rmdir('$fullPath/');
-                                    }
-                                    else {
-                                      await widget.sftpClient.remove(fullPath);
-                                    }
-                                  }
-                                  await widget.sftpClient.rmdir(path);
-                                }
-                                await removeRecursively('${widget.path}${dirEntry.filename}/');
-                              }
-                              else {
-                                await widget.sftpClient.remove('${widget.path}${dirEntry.filename}');
-                              }
-                              _listDir();
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                              }
+                              // if (dirEntry.attr.isDirectory) {
+                              //   Future<void> removeRecursively (String path) async {
+                              //     final dirContents = await widget.sftpWorker.listdir(path);
+                              //     for (SftpName entry in dirContents) {
+                              //       final fullPath = '$path${entry.filename}';
+                              //       if (entry.attr.isDirectory) {
+                              //         await removeRecursively('$fullPath/');
+                              //         await widget.sftpWorker.rmdir('$fullPath/');
+                              //       }
+                              //       else {
+                              //         await widget.sftpWorker.remove(fullPath);
+                              //       }
+                              //     }
+                              //     await widget.sftpWorker.rmdir(path);
+                              //   }
+                              //   await removeRecursively('${widget.path}${dirEntry.filename}/');
+                              // }
+                              // else {
+                              //   await widget.sftpWorker.remove('${widget.path}${dirEntry.filename}');
+                              // }
+                              // _listDir();
+                              // if (context.mounted) {
+                              //   Navigator.pop(context);
+                              // }
                             },
                             child: Text('Yes')
                           ),
@@ -155,7 +161,7 @@ class _SftpExplorerState extends State<SftpExplorer> {
               if (dirEntry.attr.isDirectory) {
                 Navigator.push(context, MaterialPageRoute(
                   builder: (context) => SftpExplorer(
-                    sftpClient: widget.sftpClient,
+                    sftpWorker: widget.sftpWorker,
                     path: '${widget.path}${dirEntry.filename}/',
                   )
                 ));
@@ -190,23 +196,23 @@ class _SftpExplorerState extends State<SftpExplorer> {
                   TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
                   TextButton(
                     onPressed: () async {
-                      try {
-                        await widget.sftpClient.mkdir('${widget.path}${nameController.text}');
-                        _listDir();
-                      }
-                      on SftpStatusError catch (e) {
-                        if (context.mounted) {
-                          if (e.code == 4) {
-                            ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Folder Already Exists'));
-                          }
-                          else {
-                            ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Error: ${e.message}'));
-                          }
-                        }
-                      }
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                      }
+                      // try {
+                      //   await widget.sftpWorker.mkdir('${widget.path}${nameController.text}');
+                      //   _listDir();
+                      // }
+                      // on SftpStatusError catch (e) {
+                      //   if (context.mounted) {
+                      //     if (e.code == 4) {
+                      //       ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Folder Already Exists'));
+                      //     }
+                      //     else {
+                      //       ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Error: ${e.message}'));
+                      //     }
+                      //   }
+                      // }
+                      // if (context.mounted) {
+                      //   Navigator.pop(context);
+                      // }
                     },
                     child: Text('Ok')
                   ),
@@ -219,35 +225,17 @@ class _SftpExplorerState extends State<SftpExplorer> {
         FloatingActionButton(
           heroTag: 'upload-file',
           onPressed: () async {
-            // TODO: upload hangingig on android
-            final List<XFile> files = await openFiles();
-            try {
-              for (XFile file in files) {
-                final remoteFile = await widget.sftpClient.open('${widget.path}${file.name}', mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.exclusive);
-                final fileSize = await file.length();
-                final uploader = remoteFile.write(
-                  file.openRead().cast(),
-                  onProgress: (progress) => setState(() => _progress = progress/fileSize)
-                );
-                setState(() {
-                  _loader = uploader;
-                  _loadingFileName = file.name;
-                });
-                await uploader.done;
-              }
-              setState(() => _loader = null);
-              _listDir();
+            final List<String> filePaths;
+            if (Platform.isAndroid | Platform.isIOS) {
+              final res = await FilePicker.platform.pickFiles(allowMultiple: true);
+              filePaths = (res?.paths ?? []).whereType<String>().toList();
             }
-            on SftpStatusError catch (e) {
-              if (context.mounted) {
-                if (e.code == 4) {
-                  ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'File Already Exists'));
-                }
-                else {
-                  ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Error: ${e.message}'));
-                }
-              }
+            else {
+              final files = await openFiles();
+              filePaths = files.map((file) => file.path).toList();
             }
+            await widget.sftpWorker.uploadFiles(widget.path, filePaths);
+            _listDir();
           },
           child: Icon(Icons.upload),
         ),
@@ -267,35 +255,5 @@ class _SftpExplorerState extends State<SftpExplorer> {
         ],
       )
     );
-  }
-
-  Widget _buildLoadingWidget(BuildContext context) {
-    return _loader != null ? Container(
-      color: Theme.of(context).colorScheme.secondaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          spacing: 10,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              spacing: 10,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Uploading file: $_loadingFileName', style: TextStyle(fontSize: 16),),
-                TextButton(
-                  onPressed: () {
-                    _loader!.abort();
-                    widget.sftpClient.remove('${widget.path}$_loadingFileName');
-                  },
-                  child: Text('Cancel')
-                ),
-              ],
-            ),
-            LinearProgressIndicator(value: _progress,)
-          ],
-        ),
-      ),
-    ) : SizedBox();
   }
 }
