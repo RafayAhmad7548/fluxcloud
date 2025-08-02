@@ -20,6 +20,8 @@ class _SftpExplorerState extends State<SftpExplorer> {
 
   bool _isLoading = true;
   late List<SftpName> _dirContents;
+
+  double? _progress;
   
   @override
   void initState() {
@@ -45,7 +47,29 @@ class _SftpExplorerState extends State<SftpExplorer> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 75,
         title: Text('Explorer'),
+        elevation: 2,
+        actionsPadding: EdgeInsets.only(right: 20),
+        actions: [
+          if (_progress != null)
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: _progress),
+                duration: Duration(milliseconds: 300),
+                builder: (context, value, _) => CircularProgressIndicator(strokeWidth: 3, value: value,)
+              ),
+              IconButton(
+                onPressed: () {
+
+                },
+                icon: Icon(Icons.upload)
+              ),
+            ]
+          ),
+        ],
       ),
       floatingActionButton: _buildFABs(context),
       body: _isLoading ? Center(child: CircularProgressIndicator()) : ListView.builder(
@@ -234,7 +258,18 @@ class _SftpExplorerState extends State<SftpExplorer> {
               final files = await openFiles();
               filePaths = files.map((file) => file.path).toList();
             }
-            await widget.sftpWorker.uploadFiles(widget.path, filePaths);
+            try {
+              await for (final progress in widget.sftpWorker.uploadFiles(widget.path, filePaths)) {
+                print(progress);
+                setState(() => _progress = progress);
+              }
+            }
+            catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.toString()));
+              }
+            }
+            setState(() => _progress = null);
             _listDir();
           },
           child: Icon(Icons.upload),

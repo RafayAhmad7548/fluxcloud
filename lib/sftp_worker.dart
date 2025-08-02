@@ -24,7 +24,7 @@ class SftpWorker {
 
   final ReceivePort _responses;
   final SendPort _commands;
-  final Map<int, Completer<Object>> _activeRequests = {};
+  final Map<int, dynamic> _activeRequests = {};
   int _idCounter = 0;
 
   SftpWorker._(this._responses, this._commands) {
@@ -98,31 +98,52 @@ class SftpWorker {
                 '$path${basename(filePath)}',
                 mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.exclusive
               );
+              bool timeout = true;
               await remoteFile.write(
                 file.openRead().cast(),
                 onProgress: (progress) {
-                  print(progress/fileSize);
+                  if (timeout) {
+                    timeout = false;
+                    sendPort.send((id, progress/fileSize));
+                    Future.delayed(Duration(seconds: 2), () => timeout = true);
+                  }
                 }
               );
             }
             on SftpStatusError catch (e) {
               sendPort.send((id, RemoteError(e.message, '')));
             }
+            sendPort.send((id, 1.0));
           }
-          sendPort.send((id, 0));
       }
     });
   }
 
   void _sftpResponseHandler(dynamic message) {
     final (int id, Object response) = message;
-    final completer = _activeRequests.remove(id)!;
 
-    if (response is RemoteError) {
-      completer.completeError(response);
+    if (_activeRequests[id] is Completer) {
+      final completer = _activeRequests.remove(id)!;
+
+      if (response is RemoteError) {
+        completer.completeError(response);
+      }
+      else {
+        completer.complete(response);
+      }
     }
-    else {
-      completer.complete(response);
+    else if (_activeRequests[id] is StreamController) {
+      final controller = _activeRequests[id] as StreamController;
+      if (response is RemoteError) {
+        controller.addError(response);
+      }
+      else {
+        controller.add(response);
+        if (response == 1) {
+          controller.close();
+          _activeRequests.remove(id);
+        }
+      }
     }
   }
 
@@ -136,12 +157,12 @@ class SftpWorker {
   }
 
   
-  Future<void> uploadFiles(String path, List<String> filePaths) async {
-    final completer = Completer<Object>.sync();
+  Stream<double> uploadFiles(String path, List<String> filePaths) {
+    final controller = StreamController<double>();
     final id = _idCounter++;
-    _activeRequests[id] = completer;
+    _activeRequests[id] = controller;
     _commands.send((id, UploadFiles(path, filePaths)));
-    await completer.future;
+    return controller.stream;
   }
 
 
