@@ -46,6 +46,7 @@ class _SftpExplorerState extends State<SftpExplorer> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // TODO: make appbar same for all directories
       appBar: AppBar(
         toolbarHeight: 75,
         title: Text('Explorer'),
@@ -220,23 +221,18 @@ class _SftpExplorerState extends State<SftpExplorer> {
                   TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
                   TextButton(
                     onPressed: () async {
-                      // try {
-                      //   await widget.sftpWorker.mkdir('${widget.path}${nameController.text}');
-                      //   _listDir();
-                      // }
-                      // on SftpStatusError catch (e) {
-                      //   if (context.mounted) {
-                      //     if (e.code == 4) {
-                      //       ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Folder Already Exists'));
-                      //     }
-                      //     else {
-                      //       ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, 'Error: ${e.message}'));
-                      //     }
-                      //   }
-                      // }
-                      // if (context.mounted) {
-                      //   Navigator.pop(context);
-                      // }
+                      try {
+                        await widget.sftpWorker.mkdir('${widget.path}${nameController.text}');
+                        _listDir();
+                      }
+                      catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.toString()));
+                        }
+                      }
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                      }
                     },
                     child: Text('Ok')
                   ),
@@ -260,7 +256,6 @@ class _SftpExplorerState extends State<SftpExplorer> {
             }
             try {
               await for (final progress in widget.sftpWorker.uploadFiles(widget.path, filePaths)) {
-                print(progress);
                 setState(() => _progress = progress);
               }
             }

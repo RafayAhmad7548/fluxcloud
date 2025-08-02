@@ -8,17 +8,26 @@ import 'package:path/path.dart';
 import 'connection.dart';
 
 sealed class SftpCommand {}
+
 class ListDir extends SftpCommand {
   final String path;
 
   ListDir(this.path);
 }
+
 class UploadFiles extends SftpCommand {
   final String path;
   final List<String> fileNames;
 
   UploadFiles(this.path, this.fileNames);
 }
+
+class MkDir extends SftpCommand {
+  final String path;
+
+  MkDir(this.path);
+}
+
 
 class SftpWorker {
 
@@ -79,7 +88,7 @@ class SftpWorker {
 
   static void _sftpCmdHandler(SendPort sendPort, ReceivePort receivePort, SftpClient sftpClient) {
     receivePort.listen((message) async {
-      final (int id, dynamic command) = message;
+      final (int id, SftpCommand command) = message;
       switch (command) {
         case ListDir(:final path):
           try {
@@ -115,6 +124,14 @@ class SftpWorker {
             }
             sendPort.send((id, 1.0));
           }
+        case MkDir(:final path):
+          try {
+            await sftpClient.mkdir(path);
+            sendPort.send((id, 0));
+          }
+          on SftpStatusError catch (e) {
+            sendPort.send((id, RemoteError(e.message, '')));
+          }
       }
     });
   }
@@ -149,7 +166,7 @@ class SftpWorker {
 
   
   Future<List<SftpName>> listdir(String path) async {
-    final completer = Completer<Object>.sync();
+    final completer = Completer.sync();
     final id = _idCounter++;
     _activeRequests[id] = completer;
     _commands.send((id, ListDir(path)));
@@ -163,6 +180,14 @@ class SftpWorker {
     _activeRequests[id] = controller;
     _commands.send((id, UploadFiles(path, filePaths)));
     return controller.stream;
+  }
+
+  Future<void> mkdir(String path) async {
+    final completer = Completer.sync();
+    final id = _idCounter++;
+    _activeRequests[id] = completer;
+    _commands.send((id, MkDir(path)));
+    await completer.future;
   }
 
 
