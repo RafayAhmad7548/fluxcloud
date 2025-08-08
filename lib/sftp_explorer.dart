@@ -78,7 +78,7 @@ class _SftpExplorerState extends State<SftpExplorer> {
               ),
               IconButton(
                 onPressed: () {
-    
+                  // TODO: show donwload details here
                 },
                 icon: Icon(Icons.upload)
               ),
@@ -87,143 +87,153 @@ class _SftpExplorerState extends State<SftpExplorer> {
         ],
       ),
       floatingActionButton: _buildFABs(context),
-      body: AnimatedSwitcher(
-        duration: Duration(milliseconds: 300),
-        transitionBuilder: (child, animation) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.fastOutSlowIn
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: ScaleTransition(
-              scale: Tween<double>(
-                begin: 0.92,
-                end: 1
-              ).animate(curved),
-              child: child,
-            ),
-          );
+      body: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (_, _) {
+          if (path != '/') {
+            path = path.substring(0, path.length - 1);
+            path = path.substring(0, path.lastIndexOf('/')+1);
+            _listDir();
+          }
         },
-        child: _isLoading ? Center(child: CircularProgressIndicator()) : ListView.builder(
-          key: ValueKey(path),
-          itemCount: _dirContents.length,
-          itemBuilder: (context, index) {
-            final dirEntry = _dirContents[index];
-            return ListTile(
-              leading: Icon(dirEntry.attr.isDirectory ? Icons.folder : Icons.description),
-              title: Text(dirEntry.filename),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    onPressed: () {
-
-                    },
-                    icon: Icon(Icons.drive_file_move)
-                  ),
-                  IconButton(
-                    onPressed: () {
-
-                    },
-                    icon: Icon(Icons.copy)
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      final newNameController = TextEditingController(text: dirEntry.filename);
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text('Rename'),
-                          content: TextField(
-                            controller: newNameController,
-                            autofocus: true,
-                            decoration: InputDecoration(
-                              labelText: 'Enter new name'
-                            ),
-                          ),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
-                            TextButton(
-                              onPressed: () async {
-                                // try {
-                                //   await widget.sftpWorker.rename('${path}${dirEntry.filename}', '${widget.path}${newNameController.text}');
-                                //   _listDir();
-                                // }
-                                // on SftpStatusError catch (e) {
-                                //   if (context.mounted) {
-                                //     ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.message));
-                                //   }
-                                // }
-                                // if (context.mounted) {
-                                //   Navigator.pop(context);
-                                // }
-                                //
-                              },
-                              child: Text('Rename')
-                            ),
-
-                          ],
-                        )
-                      );
-                    },
-                    icon: Icon(Icons.drive_file_rename_outline)
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text('Delete Permanently?'),
-                          content: Text(dirEntry.attr.isDirectory ? 'The contents of this folder will be deleted as well\nThis action cannot be undone' : 'This action cannot be undone'),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
-                            TextButton(
-                              onPressed: () async {
-                                // if (dirEntry.attr.isDirectory) {
-                                //   Future<void> removeRecursively (String path) async {
-                                //     final dirContents = await widget.sftpWorker.listdir(path);
-                                //     for (SftpName entry in dirContents) {
-                                //       final fullPath = '$path${entry.filename}';
-                                //       if (entry.attr.isDirectory) {
-                                //         await removeRecursively('$fullPath/');
-                                //         await widget.sftpWorker.rmdir('$fullPath/');
-                                //       }
-                                //       else {
-                                //         await widget.sftpWorker.remove(fullPath);
-                                //       }
-                                //     }
-                                //     await widget.sftpWorker.rmdir(path);
-                                //   }
-                                //   await removeRecursively('${path}${dirEntry.filename}/');
-                                // }
-                                // else {
-                                //   await widget.sftpWorker.remove('${path}${dirEntry.filename}');
-                                // }
-                                // _listDir();
-                                // if (context.mounted) {
-                                //   Navigator.pop(context);
-                                // }
-                              },
-                              child: Text('Yes')
-                            ),
-                          ],
-                        )
-                      );
-                    },
-                    icon: Icon(Icons.delete)
-                  ),
-                ],
-              ),
-              onTap: () {
-                if (dirEntry.attr.isDirectory) {
-                  path = '$path${dirEntry.filename}/';
-                  _listDir();
-                }
-              },
+        child: AnimatedSwitcher(
+          duration: Duration(milliseconds: 300),
+          transitionBuilder: (child, animation) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.fastOutSlowIn
             );
-          }, 
-        )
+            return FadeTransition(
+              opacity: curved,
+              child: ScaleTransition(
+                scale: Tween<double>(
+                  begin: 0.92,
+                  end: 1
+                ).animate(curved),
+                child: child,
+              ),
+            );
+          },
+          child: _isLoading ? Center(child: CircularProgressIndicator()) : ListView.builder(
+            key: ValueKey(path),
+            itemCount: _dirContents.length,
+            itemBuilder: (context, index) {
+              final dirEntry = _dirContents[index];
+              return ListTile(
+                leading: Icon(dirEntry.attr.isDirectory ? Icons.folder : Icons.description),
+                title: Text(dirEntry.filename),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      onPressed: () {
+        
+                      },
+                      icon: Icon(Icons.drive_file_move)
+                    ),
+                    IconButton(
+                      onPressed: () {
+        
+                      },
+                      icon: Icon(Icons.copy)
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        final newNameController = TextEditingController(text: dirEntry.filename);
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text('Rename'),
+                            content: TextField(
+                              controller: newNameController,
+                              autofocus: true,
+                              decoration: InputDecoration(
+                                labelText: 'Enter new name'
+                              ),
+                            ),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+                              TextButton(
+                                onPressed: () async {
+                                  // try {
+                                  //   await widget.sftpWorker.rename('${path}${dirEntry.filename}', '${widget.path}${newNameController.text}');
+                                  //   _listDir();
+                                  // }
+                                  // on SftpStatusError catch (e) {
+                                  //   if (context.mounted) {
+                                  //     ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.message));
+                                  //   }
+                                  // }
+                                  // if (context.mounted) {
+                                  //   Navigator.pop(context);
+                                  // }
+                                  //
+                                },
+                                child: Text('Rename')
+                              ),
+        
+                            ],
+                          )
+                        );
+                      },
+                      icon: Icon(Icons.drive_file_rename_outline)
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text('Delete Permanently?'),
+                            content: Text(dirEntry.attr.isDirectory ? 'The contents of this folder will be deleted as well\nThis action cannot be undone' : 'This action cannot be undone'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+                              TextButton(
+                                onPressed: () async {
+                                  // if (dirEntry.attr.isDirectory) {
+                                  //   Future<void> removeRecursively (String path) async {
+                                  //     final dirContents = await widget.sftpWorker.listdir(path);
+                                  //     for (SftpName entry in dirContents) {
+                                  //       final fullPath = '$path${entry.filename}';
+                                  //       if (entry.attr.isDirectory) {
+                                  //         await removeRecursively('$fullPath/');
+                                  //         await widget.sftpWorker.rmdir('$fullPath/');
+                                  //       }
+                                  //       else {
+                                  //         await widget.sftpWorker.remove(fullPath);
+                                  //       }
+                                  //     }
+                                  //     await widget.sftpWorker.rmdir(path);
+                                  //   }
+                                  //   await removeRecursively('${path}${dirEntry.filename}/');
+                                  // }
+                                  // else {
+                                  //   await widget.sftpWorker.remove('${path}${dirEntry.filename}');
+                                  // }
+                                  // _listDir();
+                                  // if (context.mounted) {
+                                  //   Navigator.pop(context);
+                                  // }
+                                },
+                                child: Text('Yes')
+                              ),
+                            ],
+                          )
+                        );
+                      },
+                      icon: Icon(Icons.delete)
+                    ),
+                  ],
+                ),
+                onTap: () {
+                  if (dirEntry.attr.isDirectory) {
+                    path = '$path${dirEntry.filename}/';
+                    _listDir();
+                  }
+                },
+              );
+            }, 
+          )
+        ),
       )
     );
   }
@@ -252,7 +262,7 @@ class _SftpExplorerState extends State<SftpExplorer> {
                   TextButton(
                     onPressed: () async {
                       try {
-                        await widget.sftpWorker.mkdir('${path}${nameController.text}');
+                        await widget.sftpWorker.mkdir('$path${nameController.text}');
                         _listDir();
                       }
                       catch (e) {
