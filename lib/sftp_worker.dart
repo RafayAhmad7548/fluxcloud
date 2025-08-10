@@ -35,6 +35,13 @@ class Remove extends SftpCommand {
   Remove(this.dirEntry, this.path);
 }
 
+class Rename extends SftpCommand {
+  final String oldpath;
+  final String newpath;
+
+  Rename(this.oldpath, this.newpath);
+}
+
 
 class SftpWorker {
 
@@ -163,7 +170,15 @@ class SftpWorker {
             }
             sendPort.send((id, 0));
           }
-            on SftpStatusError catch (e) {
+          on SftpStatusError catch (e) {
+            sendPort.send((id, RemoteError(e.message, '')));
+          }
+        case Rename(:final oldpath, :final newpath):
+          try {
+            await sftpClient.rename(oldpath, newpath);
+            sendPort.send((id, 0));
+          }
+          on SftpStatusError catch (e) {
             sendPort.send((id, RemoteError(e.message, '')));
           }
       }
@@ -229,6 +244,14 @@ class SftpWorker {
     final id = _idCounter++;
     _activeRequests[id] = completer;
     _commands.send((id, Remove(dirEntry, path)));
+    await completer.future;
+  }
+
+  Future<void> rename(String oldpath, String newpath) async {
+    final completer = Completer.sync();
+    final id = _idCounter++;
+    _activeRequests[id] = completer;
+    _commands.send((id, Rename(oldpath, newpath)));
     await completer.future;
   }
 

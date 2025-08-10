@@ -51,19 +51,19 @@ class OperationButtons extends StatelessWidget {
                   TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
                   TextButton(
                     onPressed: () async {
-                      // try {
-                      //   await sftpWorker.rename('${path}${dirEntry.filename}', '${widget.path}${newNameController.text}');
-                      //   _listDir();
-                      // }
-                      // on SftpStatusError catch (e) {
-                      //   if (context.mounted) {
-                      //     ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.message));
-                      //   }
-                      // }
-                      // if (context.mounted) {
-                      //   Navigator.pop(context);
-                      // }
-                      //
+                      try {
+                        await sftpWorker.rename('$path${dirEntry.filename}', '$path${newNameController.text}');
+                        listDir();
+                      }
+                      on SftpStatusError catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.message));
+                        }
+                      }
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                      }
+
                     },
                     child: Text('Rename')
                   ),
