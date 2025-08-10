@@ -28,3 +28,17 @@ class MainApp extends StatelessWidget {
     );
   }
 }
+
+SnackBar buildErrorSnackBar(BuildContext context, String error) {
+  return SnackBar(
+    backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+    behavior: SnackBarBehavior.floating,
+    content: Row(
+      spacing: 10,
+      children: [
+        Icon(Icons.error, color: Colors.red,),
+        Text(error, style: TextStyle(color: Theme.of(context).colorScheme.onSecondaryContainer),),
+      ],
+    )
+  );
+}

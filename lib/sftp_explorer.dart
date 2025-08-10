@@ -4,6 +4,7 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:fluxcloud/main.dart';
 import 'package:fluxcloud/sftp_worker.dart';
 
 import 'widgets/operation_buttons.dart';
@@ -39,7 +40,7 @@ class _SftpExplorerState extends State<SftpExplorer> {
     }
     catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.toString()));
+        ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
       }
     }
     setState(() => _isLoading = false);
@@ -168,7 +169,7 @@ class _SftpExplorerState extends State<SftpExplorer> {
                       }
                       catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.toString()));
+                          ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
                         }
                       }
                       if (context.mounted) {
@@ -202,7 +203,7 @@ class _SftpExplorerState extends State<SftpExplorer> {
             }
             catch (e) {
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(_buildErrorSnackBar(context, e.toString()));
+                ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
               }
             }
             setState(() => _progress = null);
@@ -214,17 +215,4 @@ class _SftpExplorerState extends State<SftpExplorer> {
     );
   }
 
-  SnackBar _buildErrorSnackBar(BuildContext context, String error) {
-    return SnackBar(
-      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-      behavior: SnackBarBehavior.floating,
-      content: Row(
-        spacing: 10,
-        children: [
-          Icon(Icons.error, color: Colors.red,),
-          Text(error, style: TextStyle(color: Theme.of(context).colorScheme.onSecondaryContainer),),
-        ],
-      )
-    );
-  }
 }

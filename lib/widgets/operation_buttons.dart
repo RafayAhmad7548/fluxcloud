@@ -1,5 +1,6 @@
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/material.dart';
+import 'package:fluxcloud/main.dart';
 import 'package:fluxcloud/sftp_worker.dart';
 
 class OperationButtons extends StatelessWidget {
@@ -97,7 +98,9 @@ class OperationButtons extends StatelessWidget {
                             await sftpWorker.remove(dirEntry, path);
                           }
                           catch (e) {
-                            print(e.toString());
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
+                            }
                           }
                           listDir();
                           if (context.mounted) {
