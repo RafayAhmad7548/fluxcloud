@@ -28,6 +28,13 @@ class MkDir extends SftpCommand {
   MkDir(this.path);
 }
 
+class Remove extends SftpCommand {
+  final SftpName dirEntry;
+  final String path;
+
+  Remove(this.dirEntry, this.path);
+}
+
 
 class SftpWorker {
 
@@ -132,6 +139,33 @@ class SftpWorker {
           on SftpStatusError catch (e) {
             sendPort.send((id, RemoteError(e.message, '')));
           }
+        case Remove(:final dirEntry, :final path):
+          try {
+            if (dirEntry.attr.isDirectory) {
+              Future<void> removeRecursively (String path) async {
+                final dirContents = await sftpClient.listdir(path);
+                for (SftpName entry in dirContents) {
+                  final fullPath = '$path${entry.filename}';
+                  if (entry.attr.isDirectory) {
+                    await removeRecursively('$fullPath/');
+                    await sftpClient.rmdir('$fullPath/');
+                  }
+                  else {
+                    await sftpClient.remove(fullPath);
+                  }
+                }
+                await sftpClient.rmdir(path);
+              }
+              await removeRecursively('$path${dirEntry.filename}/');
+            }
+            else {
+              await sftpClient.remove('$path${dirEntry.filename}');
+            }
+            sendPort.send((id, 0));
+          }
+            on SftpStatusError catch (e) {
+            sendPort.send((id, RemoteError(e.message, '')));
+          }
       }
     });
   }
@@ -190,5 +224,12 @@ class SftpWorker {
     await completer.future;
   }
 
+  Future<void> remove(SftpName dirEntry, String path) async {
+    final completer = Completer.sync();
+    final id = _idCounter++;
+    _activeRequests[id] = completer;
+    _commands.send((id, Remove(dirEntry, path)));
+    await completer.future;
+  }
 
 }

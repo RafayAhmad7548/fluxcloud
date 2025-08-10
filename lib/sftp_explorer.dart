@@ -124,7 +124,7 @@ class _SftpExplorerState extends State<SftpExplorer> {
               return ListTile(
                 leading: Icon(dirEntry.attr.isDirectory ? Icons.folder : Icons.description),
                 title: Text(dirEntry.filename),
-                trailing: OperationButtons(dirEntry: dirEntry),
+                trailing: OperationButtons(sftpWorker: widget.sftpWorker, path: path, dirEntries: [dirEntry], listDir: _listDir,),
                 onTap: () {
                   if (dirEntry.attr.isDirectory) {
                     path = '$path${dirEntry.filename}/';

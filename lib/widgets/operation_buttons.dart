@@ -1,13 +1,17 @@
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/material.dart';
+import 'package:fluxcloud/sftp_worker.dart';
 
 class OperationButtons extends StatelessWidget {
   const OperationButtons({
     super.key,
-    required this.dirEntry,
+    required this.sftpWorker, required this.path, required this.dirEntries, required this.listDir,
   });
 
-  final SftpName dirEntry;
+  final SftpWorker sftpWorker;
+  final String path;
+  final List<SftpName> dirEntries;
+  final Function listDir;
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +30,10 @@ class OperationButtons extends StatelessWidget {
           },
           icon: Icon(Icons.copy)
         ),
+        if (dirEntries.length == 1)
         IconButton(
           onPressed: () {
+            final dirEntry = dirEntries[0];
             final newNameController = TextEditingController(text: dirEntry.filename);
             showDialog(
               context: context,
@@ -45,7 +51,7 @@ class OperationButtons extends StatelessWidget {
                   TextButton(
                     onPressed: () async {
                       // try {
-                      //   await widget.sftpWorker.rename('${path}${dirEntry.filename}', '${widget.path}${newNameController.text}');
+                      //   await sftpWorker.rename('${path}${dirEntry.filename}', '${widget.path}${newNameController.text}');
                       //   _listDir();
                       // }
                       // on SftpStatusError catch (e) {
@@ -71,42 +77,39 @@ class OperationButtons extends StatelessWidget {
           onPressed: () {
             showDialog(
               context: context,
-              builder: (context) => AlertDialog(
-                title: Text('Delete Permanently?'),
-                content: Text(dirEntry.attr.isDirectory ? 'The contents of this folder will be deleted as well\nThis action cannot be undone' : 'This action cannot be undone'),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
-                  TextButton(
-                    onPressed: () async {
-                      // if (dirEntry.attr.isDirectory) {
-                      //   Future<void> removeRecursively (String path) async {
-                      //     final dirContents = await widget.sftpWorker.listdir(path);
-                      //     for (SftpName entry in dirContents) {
-                      //       final fullPath = '$path${entry.filename}';
-                      //       if (entry.attr.isDirectory) {
-                      //         await removeRecursively('$fullPath/');
-                      //         await widget.sftpWorker.rmdir('$fullPath/');
-                      //       }
-                      //       else {
-                      //         await widget.sftpWorker.remove(fullPath);
-                      //       }
-                      //     }
-                      //     await widget.sftpWorker.rmdir(path);
-                      //   }
-                      //   await removeRecursively('${path}${dirEntry.filename}/');
-                      // }
-                      // else {
-                      //   await widget.sftpWorker.remove('${path}${dirEntry.filename}');
-                      // }
-                      // _listDir();
-                      // if (context.mounted) {
-                      //   Navigator.pop(context);
-                      // }
-                    },
-                    child: Text('Yes')
-                  ),
-                ],
-              )
+              builder: (context) {
+                String warningText = 'This action cannot be undone';
+                if (dirEntries.length == 1 && dirEntries[0].attr.isDirectory) {
+                  warningText = 'The contents of this folder will be deleted as well\n$warningText';
+                }
+                else if (dirEntries.length > 1) {
+                  warningText = 'All selected files will be deleted\n$warningText';
+                }
+                return AlertDialog(
+                  title: Text('Delete Permanently?'),
+                  content: Text(warningText),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+                    TextButton(
+                      onPressed: () async {
+                        for (final dirEntry in dirEntries) {
+                          try {
+                            await sftpWorker.remove(dirEntry, path);
+                          }
+                          catch (e) {
+                            print(e.toString());
+                          }
+                          listDir();
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                          }
+                        }
+                      },
+                      child: Text('Yes')
+                    ),
+                  ],
+                );
+              }
             );
           },
           icon: Icon(Icons.delete)
