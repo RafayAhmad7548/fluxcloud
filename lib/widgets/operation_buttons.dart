@@ -2,17 +2,19 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/material.dart';
 import 'package:fluxcloud/main.dart';
 import 'package:fluxcloud/sftp_worker.dart';
+import 'package:path_provider/path_provider.dart';
 
 class OperationButtons extends StatelessWidget {
   const OperationButtons({
     super.key,
-    required this.sftpWorker, required this.path, required this.dirEntries, required this.listDir,
+    required this.sftpWorker, required this.path, required this.dirEntries, required this.listDir, required this.setDownloadProgress,
   });
 
   final SftpWorker sftpWorker;
   final String path;
   final List<SftpName> dirEntries;
   final Function listDir;
+  final Function(double? progress) setDownloadProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +119,24 @@ class OperationButtons extends StatelessWidget {
           },
           icon: Icon(Icons.delete)
         ),
+        IconButton(
+          onPressed: () async {
+            final downloadsDir = await getDownloadsDirectory();
+            if (downloadsDir == null) return;
+            try {
+              await for (final progress in sftpWorker.downloadFiles(dirEntries, path, downloadsDir.path)) {
+                setDownloadProgress(progress);
+              }
+              setDownloadProgress(null);
+            }
+            catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
+              }
+            }
+          },
+          icon: Icon(Icons.download)
+        )
       ],
     );
   }

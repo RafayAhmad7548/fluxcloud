@@ -25,7 +25,10 @@ class _SftpExplorerState extends State<SftpExplorer> {
   bool _isLoading = true;
   late List<SftpName> _dirContents;
 
-  double? _progress;
+  double? _uploadProgress;
+  double? _downloadProgress;
+
+  void _setDownloadProgress(double? progress) => setState(() => _downloadProgress = progress);
   
   @override
   void initState() {
@@ -70,12 +73,29 @@ class _SftpExplorerState extends State<SftpExplorer> {
           icon: Icon(Icons.arrow_back)
         ),
         actions: [
-          if (_progress != null)
+          if (_uploadProgress != null)
           Stack(
             alignment: Alignment.center,
             children: [
               TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: _progress),
+                tween: Tween(begin: 0, end: _uploadProgress),
+                duration: Duration(milliseconds: 300),
+                builder: (context, value, _) => CircularProgressIndicator(strokeWidth: 3, value: value,)
+              ),
+              IconButton(
+                onPressed: () {
+                  // TODO: show upload details here
+                },
+                icon: Icon(Icons.upload)
+              ),
+            ]
+          ),
+          if (_downloadProgress != null)
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: _downloadProgress),
                 duration: Duration(milliseconds: 300),
                 builder: (context, value, _) => CircularProgressIndicator(strokeWidth: 3, value: value,)
               ),
@@ -83,7 +103,7 @@ class _SftpExplorerState extends State<SftpExplorer> {
                 onPressed: () {
                   // TODO: show donwload details here
                 },
-                icon: Icon(Icons.upload)
+                icon: Icon(Icons.download)
               ),
             ]
           ),
@@ -125,7 +145,7 @@ class _SftpExplorerState extends State<SftpExplorer> {
               return ListTile(
                 leading: Icon(dirEntry.attr.isDirectory ? Icons.folder : Icons.description),
                 title: Text(dirEntry.filename),
-                trailing: OperationButtons(sftpWorker: widget.sftpWorker, path: path, dirEntries: [dirEntry], listDir: _listDir,),
+                trailing: OperationButtons(sftpWorker: widget.sftpWorker, path: path, dirEntries: [dirEntry], listDir: _listDir, setDownloadProgress: _setDownloadProgress,),
                 onTap: () {
                   if (dirEntry.attr.isDirectory) {
                     path = '$path${dirEntry.filename}/';
@@ -197,8 +217,17 @@ class _SftpExplorerState extends State<SftpExplorer> {
               filePaths = files.map((file) => file.path).toList();
             }
             try {
+              bool start = true;
               await for (final progress in widget.sftpWorker.uploadFiles(path, filePaths)) {
-                setState(() => _progress = progress);
+                if (start) {
+                  start = false;
+                  _listDir();
+                }
+                setState(() => _uploadProgress = progress);
+                if (progress == 1) {
+                  // TODO: fix: next file also starts to show
+                  _listDir();
+                }
               }
             }
             catch (e) {
@@ -206,7 +235,7 @@ class _SftpExplorerState extends State<SftpExplorer> {
                 ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
               }
             }
-            setState(() => _progress = null);
+            setState(() => _uploadProgress = null);
             _listDir();
           },
           child: Icon(Icons.upload),
