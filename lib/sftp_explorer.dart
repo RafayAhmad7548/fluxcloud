@@ -1,57 +1,23 @@
 import 'dart:io';
 
-import 'package:dartssh2/dartssh2.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fluxcloud/main.dart';
+import 'package:fluxcloud/providers/sftp_state.dart';
 import 'package:fluxcloud/sftp_worker.dart';
 
 import 'widgets/operation_buttons.dart';
 
-class SftpExplorer extends StatefulWidget {
+class SftpExplorer extends ConsumerWidget {
   const SftpExplorer({super.key, required this.sftpWorker});
 
   final SftpWorker sftpWorker;
 
   @override
-  State<SftpExplorer> createState() => _SftpExplorerState();
-}
-
-class _SftpExplorerState extends State<SftpExplorer> {
-
-  String path = '/';
-
-  bool _isLoading = true;
-  late List<SftpName> _dirContents;
-
-  double? _uploadProgress;
-  double? _downloadProgress;
-
-  void _setDownloadProgress(double? progress) => setState(() => _downloadProgress = progress);
-  
-  @override
-  void initState() {
-    super.initState();
-    _listDir();
-  }
-
-  Future<void> _listDir() async {
-    setState(() => _isLoading = true);
-    try {
-      _dirContents =  await widget.sftpWorker.listdir(path);
-    }
-    catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
-      }
-    }
-    setState(() => _isLoading = false);
-  }
-
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sftpState = ref.watch(sftpNotifierProvider(sftpWorker));
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 75,
@@ -60,25 +26,23 @@ class _SftpExplorerState extends State<SftpExplorer> {
         actionsPadding: EdgeInsets.only(right: 20),
         leading: IconButton(
           onPressed: () {
-            if (path == '/') {
+            if (sftpState.path == '/') {
               // TODO: figure this out
               // Navigator.pop(context);
             }
             else {
-              path = path.substring(0, path.length - 1);
-              path = path.substring(0, path.lastIndexOf('/')+1);
-              _listDir();
+              ref.read(sftpNotifierProvider(sftpWorker).notifier).goToPrevDir();
             }
           },
           icon: Icon(Icons.arrow_back)
         ),
         actions: [
-          if (_uploadProgress != null)
+          if (sftpState.uploadProgress != null)
           Stack(
             alignment: Alignment.center,
             children: [
               TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: _uploadProgress),
+                tween: Tween(begin: 0, end: sftpState.uploadProgress),
                 duration: Duration(milliseconds: 300),
                 builder: (context, value, _) => CircularProgressIndicator(strokeWidth: 3, value: value,)
               ),
@@ -90,12 +54,12 @@ class _SftpExplorerState extends State<SftpExplorer> {
               ),
             ]
           ),
-          if (_downloadProgress != null)
+          if (sftpState.downloadProgress != null)
           Stack(
             alignment: Alignment.center,
             children: [
               TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: _downloadProgress),
+                tween: Tween(begin: 0, end: sftpState.downloadProgress),
                 duration: Duration(milliseconds: 300),
                 builder: (context, value, _) => CircularProgressIndicator(strokeWidth: 3, value: value,)
               ),
@@ -109,14 +73,12 @@ class _SftpExplorerState extends State<SftpExplorer> {
           ),
         ],
       ),
-      floatingActionButton: _buildFABs(context),
+      floatingActionButton: _buildFABs(context, ref),
       body: PopScope(
         canPop: false,
         onPopInvokedWithResult: (_, _) {
-          if (path != '/') {
-            path = path.substring(0, path.length - 1);
-            path = path.substring(0, path.lastIndexOf('/')+1);
-            _listDir();
+          if (sftpState.path != '/') {
+            ref.read(sftpNotifierProvider(sftpWorker).notifier).goToPrevDir();
           }
         },
         child: AnimatedSwitcher(
@@ -137,19 +99,18 @@ class _SftpExplorerState extends State<SftpExplorer> {
               ),
             );
           },
-          child: _isLoading ? Center(child: CircularProgressIndicator()) : ListView.builder(
-            key: ValueKey(path),
-            itemCount: _dirContents.length,
+          child: sftpState.isLoading ? Center(child: CircularProgressIndicator()) : ListView.builder(
+            key: ValueKey(sftpState.path),
+            itemCount: sftpState.dirContents.length,
             itemBuilder: (context, index) {
-              final dirEntry = _dirContents[index];
+              final dirEntry = sftpState.dirContents[index];
               return ListTile(
                 leading: Icon(dirEntry.attr.isDirectory ? Icons.folder : Icons.description),
                 title: Text(dirEntry.filename),
-                trailing: OperationButtons(sftpWorker: widget.sftpWorker, path: path, dirEntries: [dirEntry], listDir: _listDir, setDownloadProgress: _setDownloadProgress,),
+                trailing: OperationButtons(sftpWorker: sftpWorker, dirEntries: [dirEntry],),
                 onTap: () {
                   if (dirEntry.attr.isDirectory) {
-                    path = '$path${dirEntry.filename}/';
-                    _listDir();
+                    ref.read(sftpNotifierProvider(sftpWorker).notifier).goToDir('${sftpState.path}${dirEntry.filename}/');
                   }
                 },
               );
@@ -160,7 +121,8 @@ class _SftpExplorerState extends State<SftpExplorer> {
     );
   }
 
-  Widget _buildFABs(BuildContext context) {
+  Widget _buildFABs(BuildContext context, WidgetRef ref) {
+    final sftpState = ref.read(sftpNotifierProvider(sftpWorker));
     return Row(
       mainAxisSize: MainAxisSize.min,
       spacing: 10,
@@ -184,8 +146,8 @@ class _SftpExplorerState extends State<SftpExplorer> {
                   TextButton(
                     onPressed: () async {
                       try {
-                        await widget.sftpWorker.mkdir('$path${nameController.text}');
-                        _listDir();
+                        await sftpWorker.mkdir('${sftpState.path}${nameController.text}');
+                        ref.read(sftpNotifierProvider(sftpWorker).notifier).listDir();
                       }
                       catch (e) {
                         if (context.mounted) {
@@ -217,16 +179,10 @@ class _SftpExplorerState extends State<SftpExplorer> {
               filePaths = files.map((file) => file.path).toList();
             }
             try {
-              bool start = true;
-              await for (final progress in widget.sftpWorker.uploadFiles(path, filePaths)) {
-                if (start) {
-                  start = false;
-                  _listDir();
-                }
-                setState(() => _uploadProgress = progress);
+              await for (final progress in sftpWorker.uploadFiles(sftpState.path, filePaths)) {
+                ref.read(sftpNotifierProvider(sftpWorker).notifier).setUploadProgress(progress);
                 if (progress == 1) {
-                  // TODO: fix: next file also starts to show
-                  _listDir();
+                  ref.read(sftpNotifierProvider(sftpWorker).notifier).listDir();
                 }
               }
             }
@@ -235,8 +191,8 @@ class _SftpExplorerState extends State<SftpExplorer> {
                 ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
               }
             }
-            setState(() => _uploadProgress = null);
-            _listDir();
+            ref.read(sftpNotifierProvider(sftpWorker).notifier).setUploadProgress(null);
+            ref.read(sftpNotifierProvider(sftpWorker).notifier).listDir();
           },
           child: Icon(Icons.upload),
         ),
