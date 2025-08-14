@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fluxcloud/connection.dart';
 import 'package:fluxcloud/sftp_explorer.dart';
+import 'package:fluxcloud/sftp_provider.dart';
 import 'package:fluxcloud/sftp_worker.dart';
 import 'package:fluxcloud/widgets/add_server_modal.dart';
+import 'package:provider/provider.dart';
 
 class SftpConnectionList extends StatefulWidget {
   const SftpConnectionList({
@@ -80,7 +82,10 @@ class _SftpConnectionListState extends State<SftpConnectionList> {
                       onTap: () async {
                         final sftpWorker = await SftpWorker.spawn(_connections[index]);
                         if (context.mounted) {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => SftpExplorer(sftpWorker: sftpWorker,)));
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => ChangeNotifierProvider(
+                            create: (_) => SftpProvider(sftpWorker),
+                            child: SftpExplorer()
+                          )));
                         }
                       },
                       borderRadius: BorderRadius.circular(10),

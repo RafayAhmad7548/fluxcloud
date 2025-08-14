@@ -1,23 +1,20 @@
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/material.dart';
 import 'package:fluxcloud/main.dart';
-import 'package:fluxcloud/sftp_worker.dart';
+import 'package:fluxcloud/sftp_provider.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 
 class OperationButtons extends StatelessWidget {
   const OperationButtons({
-    super.key,
-    required this.sftpWorker, required this.path, required this.dirEntries, required this.listDir, required this.setDownloadProgress,
+    super.key, required this.dirEntries,
   });
 
-  final SftpWorker sftpWorker;
-  final String path;
   final List<SftpName> dirEntries;
-  final Function listDir;
-  final Function(double? progress) setDownloadProgress;
 
   @override
   Widget build(BuildContext context) {
+    final sftpProvider = context.read<SftpProvider>();
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -54,8 +51,8 @@ class OperationButtons extends StatelessWidget {
                   TextButton(
                     onPressed: () async {
                       try {
-                        await sftpWorker.rename('$path${dirEntry.filename}', '$path${newNameController.text}');
-                        listDir();
+                        await sftpProvider.sftpWorker.rename('${sftpProvider.path}${dirEntry.filename}', '${sftpProvider.path}${newNameController.text}');
+                        sftpProvider.listDir();
                       }
                       on SftpStatusError catch (e) {
                         if (context.mounted) {
@@ -97,14 +94,14 @@ class OperationButtons extends StatelessWidget {
                       onPressed: () async {
                         for (final dirEntry in dirEntries) {
                           try {
-                            await sftpWorker.remove(dirEntry, path);
+                            await sftpProvider.sftpWorker.remove(dirEntry, sftpProvider.path);
                           }
                           catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
                             }
                           }
-                          listDir();
+                          sftpProvider.listDir();
                           if (context.mounted) {
                             Navigator.pop(context);
                           }
@@ -125,8 +122,8 @@ class OperationButtons extends StatelessWidget {
             if (downloadsDir == null) return;
             for (final dirEntry in dirEntries) {
               try {
-                await for (final progress in sftpWorker.downloadFile(dirEntry, path, downloadsDir.path)) {
-                  setDownloadProgress(progress);
+                await for (final progress in sftpProvider.sftpWorker.downloadFile(dirEntry, sftpProvider.path, downloadsDir.path)) {
+                  sftpProvider.setDownloadProgress(progress);
                 }
               }
               catch (e) {
@@ -135,7 +132,7 @@ class OperationButtons extends StatelessWidget {
                 }
               }
             }
-            setDownloadProgress(null);
+            sftpProvider.setDownloadProgress(null);
           },
           icon: Icon(Icons.download)
         )
