@@ -50,6 +50,13 @@ class DownloadFile extends SftpCommand {
   DownloadFile(this.file, this.path, this.downloadPath);
 }
 
+class Copy extends SftpCommand {
+  final String filePath;
+  final String copyToPath;
+
+  Copy(this.filePath, this.copyToPath);
+}
+
 
 class SftpWorker {
 
@@ -227,6 +234,15 @@ class SftpWorker {
           }
         case DownloadFile():
           downloadController.add((id, command));
+        case Copy(:final filePath, :final copyToPath):
+          try {
+            // TODO: complete this
+            sendPort.send((id, 0));
+          }
+          on SftpStatusError catch (e) {
+            sendPort.send((id, RemoteError(e.message, '')));
+          }
+
       }
     });
   }
@@ -307,6 +323,14 @@ class SftpWorker {
     _activeRequests[id] = controller;
     _commands.send((id, DownloadFile(file, path, downloadPath)));
     return controller.stream;
+  }
+
+  Future<void> copy(String filePath, String copyToPath) async {
+    final completer = Completer.sync();
+    final id = _idCounter++;
+    _activeRequests[id] = completer;
+    _commands.send((id, Copy(filePath, copyToPath)));
+    await completer.future;
   }
 
 }

@@ -20,13 +20,15 @@ class OperationButtons extends StatelessWidget {
       children: [
         IconButton(
           onPressed: () {
-            
+            final filePaths = dirEntries.map((dirEntry) => '${sftpProvider.path}${dirEntry.filename}').toList();
+            sftpProvider.setCopyOrMoveFiles(filePaths, false);
           },
           icon: Icon(Icons.drive_file_move)
         ),
         IconButton(
           onPressed: () {
-            
+            final filePaths = dirEntries.map((dirEntry) => '${sftpProvider.path}${dirEntry.filename}').toList();
+            sftpProvider.setCopyOrMoveFiles(filePaths, true);
           },
           icon: Icon(Icons.copy)
         ),

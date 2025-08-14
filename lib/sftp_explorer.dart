@@ -1,10 +1,12 @@
 import 'dart:io';
 
+import 'package:dartssh2/dartssh2.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:fluxcloud/main.dart';
 import 'package:fluxcloud/sftp_provider.dart';
+import 'package:path/path.dart';
 import 'package:provider/provider.dart';
 
 import 'widgets/operation_buttons.dart';
@@ -74,6 +76,7 @@ class SftpExplorer extends StatelessWidget {
         ],
       ),
       floatingActionButton: _buildFABs(context),
+      bottomNavigationBar: _buildCopyMoveButton(context),
       body: PopScope(
         canPop: false,
         onPopInvokedWithResult: (_, _) {
@@ -200,6 +203,70 @@ class SftpExplorer extends StatelessWidget {
           child: Icon(Icons.upload),
         ),
       ],
+    );
+  }
+
+   Widget _buildCopyMoveButton(BuildContext context) {
+    return Selector<SftpProvider, (List<String>?, bool)>(
+      selector: (_, sftpProvider) => (sftpProvider.toBeMovedOrCopied, sftpProvider.isCopy),
+      builder: (_, data, __) {
+        final (toBeMovedOrCopied, isCopy) = data;
+        if (toBeMovedOrCopied == null) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            spacing: 10,
+            children: [
+              Expanded(child: ElevatedButton(
+                onPressed: () async {
+                  final sftpProvider = context.read<SftpProvider>();
+                  for (final filePath in toBeMovedOrCopied) {
+                    try {
+                      if (isCopy) {
+
+                      }
+                      else {
+                        final fileName = basename(filePath);
+                        await sftpProvider.sftpWorker.rename(filePath, '${sftpProvider.path}$fileName');
+                      }
+                    }
+                    catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
+                      }
+                    }
+                  }
+                  sftpProvider.setCopyOrMoveFiles(null, isCopy);
+                  sftpProvider.listDir();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                  foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(isCopy ? 'Copy Here' : 'Move Here'),
+                ),
+              )),
+              IconButton(
+                onPressed: () {
+                  context.read<SftpProvider>().setCopyOrMoveFiles(null, isCopy);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                  foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer
+                ),
+                icon: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(Icons.close),
+                ),
+              )
+            ],
+          ),
+        );
+      }
     );
   }
 

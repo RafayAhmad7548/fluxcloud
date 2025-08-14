@@ -11,6 +11,9 @@ class SftpProvider extends ChangeNotifier {
 
   double? _uploadProgress;
   double? _downloadProgress;
+  
+  List<String>? _toBeMovedOrCopied;
+  bool _isCopy = false;
 
   SftpProvider(this._sftpWorker) {
     listDir();
@@ -24,6 +27,9 @@ class SftpProvider extends ChangeNotifier {
 
   double? get uploadProgress => _uploadProgress;
   double? get downloadProgress => _downloadProgress;
+
+  List<String>? get toBeMovedOrCopied => _toBeMovedOrCopied;
+  bool get isCopy => _isCopy;
   
   Future<void> listDir() async {
     _isLoading = true;
@@ -51,6 +57,12 @@ class SftpProvider extends ChangeNotifier {
 
   void setDownloadProgress(double? progress) {
     _downloadProgress = progress;
+    notifyListeners();
+  }
+
+  void setCopyOrMoveFiles(List<String>? files, bool isCopy) {
+    _toBeMovedOrCopied = files;
+    _isCopy = isCopy;
     notifyListeners();
   }
 
