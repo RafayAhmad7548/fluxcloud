@@ -15,11 +15,11 @@ class ListDir extends SftpCommand {
   ListDir(this.path);
 }
 
-class UploadFiles extends SftpCommand {
+class UploadFile extends SftpCommand {
   final String path;
-  final List<String> filePaths;
+  final String filePath;
 
-  UploadFiles(this.path, this.filePaths);
+  UploadFile(this.path, this.filePath);
 }
 
 class MkDir extends SftpCommand {
@@ -42,12 +42,12 @@ class Rename extends SftpCommand {
   Rename(this.oldpath, this.newpath);
 }
 
-class DownloadFiles extends SftpCommand {
-  final List<SftpName> files;
+class DownloadFile extends SftpCommand {
+  final SftpName file;
   final String path;
   final String downloadPath;
 
-  DownloadFiles(this.files, this.path, this.downloadPath);
+  DownloadFile(this.file, this.path, this.downloadPath);
 }
 
 
@@ -120,33 +120,30 @@ class SftpWorker {
           on SftpStatusError catch (e) {
             sendPort.send((id, RemoteError(e.message, '')));
           }
-        case UploadFiles(:final path, :final filePaths):
-          for (var filePath in filePaths) {
-            try {
-              final file = File(filePath);
-              final fileSize = await file.length();
-              final remoteFile = await sftpClient.open(
-                '$path${basename(filePath)}',
-                mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.exclusive
-              );
-              bool timeout = true;
-              await remoteFile.write(
-                file.openRead().cast(),
-                onProgress: (progress) {
-                  if (timeout) {
-                    timeout = false;
-                    sendPort.send((id, progress/fileSize));
-                    Future.delayed(Duration(seconds: 2), () => timeout = true);
-                  }
+        case UploadFile(:final path, :final filePath):
+          try {
+            final file = File(filePath);
+            final fileSize = await file.length();
+            final remoteFile = await sftpClient.open(
+              '$path${basename(filePath)}',
+              mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.exclusive
+            );
+            bool timeout = true;
+            await remoteFile.write(
+              file.openRead().cast(),
+              onProgress: (progress) {
+                if (timeout) {
+                  timeout = false;
+                  sendPort.send((id, progress/fileSize));
+                  Future.delayed(Duration(seconds: 2), () => timeout = true);
                 }
-              );
-            }
-            on SftpStatusError catch (e) {
-              sendPort.send((id, RemoteError(e.message, '')));
-            }
-            sendPort.send((id, 1.0));
+              }
+            );
           }
-          sendPort.send((id, null));
+          on SftpStatusError catch (e) {
+            sendPort.send((id, RemoteError(e.message, '')));
+          }
+          sendPort.send((id, 1.0));
         case MkDir(:final path):
           try {
             await sftpClient.mkdir(path);
@@ -190,42 +187,39 @@ class SftpWorker {
           on SftpStatusError catch (e) {
             sendPort.send((id, RemoteError(e.message, '')));
           }
-        case DownloadFiles(:final files, :final path, :final downloadPath):
-          for (final file in files) {
-            try {
-              final localFile = File('$downloadPath/${file.filename}');
-              if (await localFile.exists()) {
-                sendPort.send((id, RemoteError('File Already Exists', '')));
-                continue;
-              }
-              final localFileWriter = await localFile.open(mode: FileMode.write);
-              final remoteFile = await sftpClient.open('$path${file.filename}');
-              final fileSize = file.attr.size!;
-              bool timeout = true;
-              await for (final bytes in remoteFile.read(
-                onProgress: (progress) {
-                  if (timeout) {
-                    timeout = false;
-                    sendPort.send((id, progress/fileSize));
-                    Future.delayed(Duration(seconds: 2), () => timeout = true);
-                  }
+        case DownloadFile(:final file, :final path, :final downloadPath):
+          try {
+            final localFile = File('$downloadPath/${file.filename}');
+            if (await localFile.exists()) {
+              sendPort.send((id, RemoteError('File Already Exists', '')));
+              break;
+            }
+            final localFileWriter = await localFile.open(mode: FileMode.write);
+            final remoteFile = await sftpClient.open('$path${file.filename}');
+            final fileSize = file.attr.size!;
+            bool timeout = true;
+            await for (final bytes in remoteFile.read(
+              onProgress: (progress) {
+                if (timeout) {
+                  timeout = false;
+                  sendPort.send((id, progress/fileSize));
+                  Future.delayed(Duration(seconds: 2), () => timeout = true);
                 }
-              )) {
-                await localFileWriter.writeFrom(bytes);
               }
+            )) {
+              await localFileWriter.writeFrom(bytes);
             }
-            on SftpStatusError catch (e) {
-              sendPort.send((id, RemoteError(e.message, '')));
-            }
-            sendPort.send((id, 1.0));
           }
-          sendPort.send((id, null));
+          on SftpStatusError catch (e) {
+            sendPort.send((id, RemoteError(e.message, '')));
+          }
+          sendPort.send((id, 1.0));
       }
     });
   }
 
   void _sftpResponseHandler(dynamic message) {
-    final (int id, Object? response) = message;
+    final (int id, Object response) = message;
 
     if (_activeRequests[id] is Completer) {
       final completer = _activeRequests.remove(id)!;
@@ -243,12 +237,10 @@ class SftpWorker {
         controller.addError(response);
       }
       else {
-        if (response == null) {
+        controller.add(response);
+        if (response == 1) {
           controller.close();
           _activeRequests.remove(id);
-        }
-        else {
-          controller.add(response);
         }
       }
     }
@@ -264,11 +256,11 @@ class SftpWorker {
   }
 
   
-  Stream<double> uploadFiles(String path, List<String> filePaths) {
+  Stream<double> uploadFile(String path, String filePath) {
     final controller = StreamController<double>();
     final id = _idCounter++;
     _activeRequests[id] = controller;
-    _commands.send((id, UploadFiles(path, filePaths)));
+    _commands.send((id, UploadFile(path, filePath)));
     return controller.stream;
   }
 
@@ -296,11 +288,11 @@ class SftpWorker {
     await completer.future;
   }
 
-  Stream<double> downloadFiles(List<SftpName> files, String path, String downloadPath) {
+  Stream<double> downloadFile(SftpName file, String path, String downloadPath) {
     final controller = StreamController<double>();
     final id = _idCounter++;
     _activeRequests[id] = controller;
-    _commands.send((id, DownloadFiles(files, path, downloadPath)));
+    _commands.send((id, DownloadFile(file, path, downloadPath)));
     return controller.stream;
   }
 

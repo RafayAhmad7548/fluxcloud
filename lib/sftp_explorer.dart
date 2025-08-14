@@ -216,23 +216,17 @@ class _SftpExplorerState extends State<SftpExplorer> {
               final files = await openFiles();
               filePaths = files.map((file) => file.path).toList();
             }
-            try {
-              bool start = true;
-              await for (final progress in widget.sftpWorker.uploadFiles(path, filePaths)) {
-                if (start) {
-                  start = false;
-                  _listDir();
+            for (final filePath in filePaths) {
+              try {
+                await for (final progress in widget.sftpWorker.uploadFile(path, filePath)) {
+                  setState(() => _uploadProgress = progress);
                 }
-                setState(() => _uploadProgress = progress);
-                if (progress == 1) {
-                  // TODO: fix: next file also starts to show
-                  _listDir();
-                }
+                await _listDir();
               }
-            }
-            catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
+              catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
+                }
               }
             }
             setState(() => _uploadProgress = null);

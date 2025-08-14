@@ -123,17 +123,19 @@ class OperationButtons extends StatelessWidget {
           onPressed: () async {
             final downloadsDir = await getDownloadsDirectory();
             if (downloadsDir == null) return;
-            try {
-              await for (final progress in sftpWorker.downloadFiles(dirEntries, path, downloadsDir.path)) {
-                setDownloadProgress(progress);
+            for (final dirEntry in dirEntries) {
+              try {
+                await for (final progress in sftpWorker.downloadFile(dirEntry, path, downloadsDir.path)) {
+                  setDownloadProgress(progress);
+                }
               }
-              setDownloadProgress(null);
-            }
-            catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
+              catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
+                }
               }
             }
+            setDownloadProgress(null);
           },
           icon: Icon(Icons.download)
         )
