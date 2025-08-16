@@ -256,10 +256,10 @@ class SftpExplorer extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: progress),
-        duration: Duration(milliseconds: 300),
-        builder: (context, value, _) => CircularProgressIndicator(strokeWidth: 3, value: value,)
-      ),
+          tween: Tween(begin: 0, end: progress),
+          duration: Duration(milliseconds: 300),
+          builder: (context, value, _) => CircularProgressIndicator(strokeWidth: 3, value: value,)
+        ),
         IconButton(
           onPressed: () {
             // TODO: show details here
