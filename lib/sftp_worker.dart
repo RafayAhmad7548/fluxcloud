@@ -142,7 +142,7 @@ class SftpWorker {
           await localFileWriter.writeFrom(bytes);
         }
       }
-        on SftpStatusError catch (e) {
+      on SftpStatusError catch (e) {
         sendPort.send((id, RemoteError(e.message, '')));
       }
       sendPort.send((id, 1.0));
@@ -170,7 +170,33 @@ class SftpWorker {
           }
         );
       }
-        on SftpStatusError catch (e) {
+      on SftpStatusError catch (e) {
+        sendPort.send((id, RemoteError(e.message, '')));
+      }
+      sendPort.send((id, 1.0));
+    }).listen((_) {});
+
+
+    final StreamController<(int, Copy)> copyController = StreamController();
+    copyController.stream.asyncMap((cmd) async {
+      final (id, copyCmd) = cmd;
+      try {
+        final srcFile = await sftpClient.open(copyCmd.filePath);
+        final dstFile = await sftpClient.open(copyCmd.copyToPath, mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.exclusive);
+        final fileSize = (await srcFile.stat()).size!;
+        bool timeout = true;
+        await dstFile.write(
+          srcFile.read(),
+          onProgress: (progress) {
+            if (timeout) {
+              timeout = false;
+              sendPort.send((id, progress/fileSize));
+              Future.delayed(Duration(seconds: 2), () => timeout = true);
+            }
+          }
+        );
+      }
+      on SftpStatusError catch (e) {
         sendPort.send((id, RemoteError(e.message, '')));
       }
       sendPort.send((id, 1.0));
@@ -234,15 +260,8 @@ class SftpWorker {
           }
         case DownloadFile():
           downloadController.add((id, command));
-        case Copy(:final filePath, :final copyToPath):
-          try {
-            // TODO: complete this
-            sendPort.send((id, 0));
-          }
-          on SftpStatusError catch (e) {
-            sendPort.send((id, RemoteError(e.message, '')));
-          }
-
+        case Copy():
+          copyController.add((id, command));
       }
     });
   }
@@ -325,12 +344,12 @@ class SftpWorker {
     return controller.stream;
   }
 
-  Future<void> copy(String filePath, String copyToPath) async {
-    final completer = Completer.sync();
+  Stream<double> copy(String filePath, String copyToPath) {
+    final controller = StreamController<double>();
     final id = _idCounter++;
-    _activeRequests[id] = completer;
+    _activeRequests[id] = controller;
     _commands.send((id, Copy(filePath, copyToPath)));
-    await completer.future;
+    return controller.stream;
   }
 
 }

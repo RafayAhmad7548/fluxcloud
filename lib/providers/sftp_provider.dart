@@ -9,12 +9,6 @@ class SftpProvider extends ChangeNotifier {
   bool _isLoading = false;
   late List<SftpName> _dirContents;
 
-  double? _uploadProgress;
-  double? _downloadProgress;
-  
-  List<String>? _toBeMovedOrCopied;
-  bool _isCopy = false;
-
   SftpProvider(this._sftpWorker) {
     listDir();
   }
@@ -25,12 +19,6 @@ class SftpProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   List<SftpName> get dirContents  => _dirContents;
 
-  double? get uploadProgress => _uploadProgress;
-  double? get downloadProgress => _downloadProgress;
-
-  List<String>? get toBeMovedOrCopied => _toBeMovedOrCopied;
-  bool get isCopy => _isCopy;
-  
   Future<void> listDir() async {
     _isLoading = true;
     notifyListeners();
@@ -48,22 +36,6 @@ class SftpProvider extends ChangeNotifier {
   void goToDir(String path) {
     _path = path;
     listDir();
-  }
-
-  void setUploadProgress(double? progress) {
-    _uploadProgress = progress;
-    notifyListeners();
-  }
-
-  void setDownloadProgress(double? progress) {
-    _downloadProgress = progress;
-    notifyListeners();
-  }
-
-  void setCopyOrMoveFiles(List<String>? files, bool isCopy) {
-    _toBeMovedOrCopied = files;
-    _isCopy = isCopy;
-    notifyListeners();
   }
 
 }

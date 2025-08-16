@@ -1,15 +1,15 @@
 import 'dart:io';
 
-import 'package:dartssh2/dartssh2.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:fluxcloud/main.dart';
-import 'package:fluxcloud/sftp_provider.dart';
+import 'package:fluxcloud/providers/sftp_loading_provider.dart';
+import 'package:fluxcloud/providers/sftp_provider.dart';
+import 'package:fluxcloud/widgets/operation_buttons.dart';
 import 'package:path/path.dart';
 import 'package:provider/provider.dart';
 
-import 'widgets/operation_buttons.dart';
 
 class SftpExplorer extends StatelessWidget {
   const SftpExplorer({super.key});
@@ -34,46 +34,7 @@ class SftpExplorer extends StatelessWidget {
           },
           icon: Icon(Icons.arrow_back)
         ),
-        actions: [
-          Selector<SftpProvider, double?>(
-            selector: (_, sftpProvider) => sftpProvider.uploadProgress,
-            builder: (_, uploadProgress, __) => uploadProgress != null ? Stack(
-              alignment: Alignment.center,
-              children: [
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: uploadProgress),
-                  duration: Duration(milliseconds: 300),
-                  builder: (context, value, _) => CircularProgressIndicator(strokeWidth: 3, value: value,)
-                ),
-                IconButton(
-                  onPressed: () {
-                    // TODO: show upload details here
-                  },
-                  icon: Icon(Icons.upload)
-                ),
-              ]
-            ) : const SizedBox.shrink(),
-          ),
-          Selector<SftpProvider, double?>(
-            selector: (_, sftpProvider) => sftpProvider.downloadProgress,
-            builder: (_, downloadProgress, __) => downloadProgress != null ? Stack(
-              alignment: Alignment.center,
-              children: [
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: downloadProgress),
-                  duration: Duration(milliseconds: 300),
-                  builder: (context, value, _) => CircularProgressIndicator(strokeWidth: 3, value: value,)
-                ),
-                IconButton(
-                  onPressed: () {
-                    // TODO: show donwload details here
-                  },
-                  icon: Icon(Icons.download)
-                ),
-              ]
-            ) : const SizedBox.shrink(),
-          ),
-        ],
+        actions: _buildLoadingButtons,
       ),
       floatingActionButton: _buildFABs(context),
       bottomNavigationBar: _buildCopyMoveButton(context),
@@ -127,6 +88,8 @@ class SftpExplorer extends StatelessWidget {
   }
 
   Widget _buildFABs(BuildContext context) {
+    final sftpProvider = context.read<SftpProvider>();
+    final sftpLoadingProvider = context.read<SftpLoadingProvider>();
     return Row(
       mainAxisSize: MainAxisSize.min,
       spacing: 10,
@@ -149,7 +112,6 @@ class SftpExplorer extends StatelessWidget {
                   TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
                   TextButton(
                     onPressed: () async {
-                      final sftpProvider = context.read<SftpProvider>();
                       try {
                         await sftpProvider.sftpWorker.mkdir('${sftpProvider.path}${nameController.text}');
                         sftpProvider.listDir();
@@ -174,7 +136,6 @@ class SftpExplorer extends StatelessWidget {
         FloatingActionButton(
           heroTag: 'upload-file',
           onPressed: () async {
-            final sftpProvider = context.read<SftpProvider>();
             final List<String> filePaths;
             if (Platform.isAndroid | Platform.isIOS) {
               final res = await FilePicker.platform.pickFiles(allowMultiple: true);
@@ -187,7 +148,7 @@ class SftpExplorer extends StatelessWidget {
             for (final filePath in filePaths) {
               try {
                 await for (final progress in sftpProvider.sftpWorker.uploadFile(sftpProvider.path, filePath)) {
-                  sftpProvider.setUploadProgress(progress);
+                  sftpLoadingProvider.setUploadProgress(progress);
                 }
                 await sftpProvider.listDir();
               }
@@ -197,7 +158,7 @@ class SftpExplorer extends StatelessWidget {
                 }
               }
             }
-            sftpProvider.setUploadProgress(null);
+            sftpLoadingProvider.setUploadProgress(null);
             sftpProvider.listDir();
           },
           child: Icon(Icons.upload),
@@ -206,9 +167,9 @@ class SftpExplorer extends StatelessWidget {
     );
   }
 
-   Widget _buildCopyMoveButton(BuildContext context) {
-    return Selector<SftpProvider, (List<String>?, bool)>(
-      selector: (_, sftpProvider) => (sftpProvider.toBeMovedOrCopied, sftpProvider.isCopy),
+  Widget _buildCopyMoveButton(BuildContext context) {
+    return Selector<SftpLoadingProvider, (List<String>?, bool)>(
+      selector: (_, sftpLoadingProvider) => (sftpLoadingProvider.toBeMovedOrCopied, sftpLoadingProvider.isCopy),
       builder: (_, data, __) {
         final (toBeMovedOrCopied, isCopy) = data;
         if (toBeMovedOrCopied == null) {
@@ -222,13 +183,16 @@ class SftpExplorer extends StatelessWidget {
               Expanded(child: ElevatedButton(
                 onPressed: () async {
                   final sftpProvider = context.read<SftpProvider>();
+                  final sftpLoadingProvider = context.read<SftpLoadingProvider>();
                   for (final filePath in toBeMovedOrCopied) {
                     try {
+                      final fileName = basename(filePath);
                       if (isCopy) {
-
+                        await for (final progress in sftpProvider.sftpWorker.copy(filePath, '${sftpProvider.path}$fileName')) {
+                          sftpLoadingProvider.setCopyProgress(progress);
+                        }
                       }
                       else {
-                        final fileName = basename(filePath);
                         await sftpProvider.sftpWorker.rename(filePath, '${sftpProvider.path}$fileName');
                       }
                     }
@@ -238,7 +202,9 @@ class SftpExplorer extends StatelessWidget {
                       }
                     }
                   }
-                  sftpProvider.setCopyOrMoveFiles(null, isCopy);
+                  // TODO: figure out where to put this line
+                  sftpLoadingProvider.setCopyOrMoveFiles(null, isCopy);
+                  sftpLoadingProvider.setCopyProgress(null);
                   sftpProvider.listDir();
                 },
                 style: ElevatedButton.styleFrom(
@@ -252,7 +218,7 @@ class SftpExplorer extends StatelessWidget {
               )),
               IconButton(
                 onPressed: () {
-                  context.read<SftpProvider>().setCopyOrMoveFiles(null, isCopy);
+                  context.read<SftpLoadingProvider>().setCopyOrMoveFiles(null, isCopy);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
@@ -268,6 +234,40 @@ class SftpExplorer extends StatelessWidget {
         );
       }
     );
+  }
+
+  List<Widget> get _buildLoadingButtons => [
+    Selector<SftpLoadingProvider, double?>(
+      selector: (_, sftpLoadingProvider) => sftpLoadingProvider.uploadProgress,
+      builder: (_, uploadProgress, __) => _buildLoader(uploadProgress, Icons.upload)
+    ),
+    Selector<SftpLoadingProvider, double?>(
+      selector: (_, sftpLoadingProvider) => sftpLoadingProvider.downloadProgress,
+      builder: (_, downloadProgress, __) => _buildLoader(downloadProgress, Icons.download)
+    ),
+    Selector<SftpLoadingProvider, double?>(
+      selector: (_, sftpLoadingProvider) => sftpLoadingProvider.copyProgress,
+      builder: (_, copyProgress, __) => _buildLoader(copyProgress, Icons.copy)
+    ),
+  ];
+
+  Widget _buildLoader(double? progress, IconData icon) {
+    return progress != null ? Stack(
+      alignment: Alignment.center,
+      children: [
+        TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: progress),
+        duration: Duration(milliseconds: 300),
+        builder: (context, value, _) => CircularProgressIndicator(strokeWidth: 3, value: value,)
+      ),
+        IconButton(
+          onPressed: () {
+            // TODO: show details here
+          },
+          icon: Icon(icon)
+        ),
+      ]
+    ) : const SizedBox.shrink();
   }
 
 }

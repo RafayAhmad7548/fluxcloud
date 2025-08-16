@@ -1,7 +1,8 @@
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/material.dart';
 import 'package:fluxcloud/main.dart';
-import 'package:fluxcloud/sftp_provider.dart';
+import 'package:fluxcloud/providers/sftp_loading_provider.dart';
+import 'package:fluxcloud/providers/sftp_provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -15,20 +16,21 @@ class OperationButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sftpProvider = context.read<SftpProvider>();
+    final sftpLoadingProvider = context.read<SftpLoadingProvider>();
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
           onPressed: () {
             final filePaths = dirEntries.map((dirEntry) => '${sftpProvider.path}${dirEntry.filename}').toList();
-            sftpProvider.setCopyOrMoveFiles(filePaths, false);
+            sftpLoadingProvider.setCopyOrMoveFiles(filePaths, false);
           },
           icon: Icon(Icons.drive_file_move)
         ),
         IconButton(
           onPressed: () {
             final filePaths = dirEntries.map((dirEntry) => '${sftpProvider.path}${dirEntry.filename}').toList();
-            sftpProvider.setCopyOrMoveFiles(filePaths, true);
+            sftpLoadingProvider.setCopyOrMoveFiles(filePaths, true);
           },
           icon: Icon(Icons.copy)
         ),
@@ -125,7 +127,7 @@ class OperationButtons extends StatelessWidget {
             for (final dirEntry in dirEntries) {
               try {
                 await for (final progress in sftpProvider.sftpWorker.downloadFile(dirEntry, sftpProvider.path, downloadsDir.path)) {
-                  sftpProvider.setDownloadProgress(progress);
+                  sftpLoadingProvider.setDownloadProgress(progress);
                 }
               }
               catch (e) {
@@ -134,7 +136,7 @@ class OperationButtons extends StatelessWidget {
                 }
               }
             }
-            sftpProvider.setDownloadProgress(null);
+            sftpLoadingProvider.setDownloadProgress(null);
           },
           icon: Icon(Icons.download)
         )
