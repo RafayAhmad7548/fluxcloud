@@ -22,6 +22,7 @@ class OperationButtons extends StatelessWidget {
       children: [
         IconButton(
           onPressed: () {
+            sftpProvider.clearSelectedFiles();
             final filePaths = dirEntries.map((dirEntry) => '${sftpProvider.path}${dirEntry.filename}').toList();
             sftpLoadingProvider.setCopyOrMoveFiles(filePaths, false);
           },
@@ -29,6 +30,7 @@ class OperationButtons extends StatelessWidget {
         ),
         IconButton(
           onPressed: () {
+            sftpProvider.clearSelectedFiles();
             final filePaths = dirEntries.map((dirEntry) => '${sftpProvider.path}${dirEntry.filename}').toList();
             sftpLoadingProvider.setCopyOrMoveFiles(filePaths, true);
           },
@@ -105,11 +107,12 @@ class OperationButtons extends StatelessWidget {
                               ScaffoldMessenger.of(context).showSnackBar(buildErrorSnackBar(context, e.toString()));
                             }
                           }
-                          sftpProvider.listDir();
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                          }
                         }
+                        sftpProvider.listDir();
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                        sftpProvider.clearSelectedFiles();
                       },
                       child: Text('Yes')
                     ),
@@ -122,6 +125,7 @@ class OperationButtons extends StatelessWidget {
         ),
         IconButton(
           onPressed: () async {
+            sftpProvider.clearSelectedFiles();
             final downloadsDir = await getDownloadsDirectory();
             if (downloadsDir == null) return;
             for (final dirEntry in dirEntries) {

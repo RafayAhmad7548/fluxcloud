@@ -9,6 +9,8 @@ class SftpProvider extends ChangeNotifier {
   bool _isLoading = false;
   late List<SftpName> _dirContents;
 
+  final List<SftpName> _selectedFiles = [];
+
   SftpProvider(this._sftpWorker) {
     listDir();
   }
@@ -18,6 +20,8 @@ class SftpProvider extends ChangeNotifier {
   String get path => _path;
   bool get isLoading => _isLoading;
   List<SftpName> get dirContents  => _dirContents;
+  List<SftpName> get selectedFiles  => _selectedFiles;
+  bool get isSelectionMode => _selectedFiles.isNotEmpty;
 
   Future<void> listDir() async {
     _isLoading = true;
@@ -37,5 +41,23 @@ class SftpProvider extends ChangeNotifier {
     _path = path;
     listDir();
   }
+
+  void selectFile(SftpName file) {
+    _selectedFiles.add(file);
+    notifyListeners();
+  }
+
+  void toggleSelection(SftpName file) {
+    if (!_selectedFiles.remove(file)) {
+      _selectedFiles.add(file);
+    }
+    notifyListeners();
+  }
+
+  void clearSelectedFiles() {
+    _selectedFiles.clear();
+    notifyListeners();
+  }
+
 
 }

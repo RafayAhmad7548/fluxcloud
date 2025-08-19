@@ -1,7 +1,9 @@
 import 'dart:io';
 
+import 'package:dartssh2/dartssh2.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:fluxcloud/main.dart';
 import 'package:fluxcloud/providers/sftp_loading_provider.dart';
@@ -34,7 +36,7 @@ class SftpExplorer extends StatelessWidget {
           },
           icon: Icon(Icons.arrow_back)
         ),
-        actions: _buildLoadingButtons,
+        actions: [_buildAppBarButtons()]
       ),
       floatingActionButton: _buildFABs(context),
       bottomNavigationBar: _buildCopyMoveButton(context),
@@ -70,13 +72,27 @@ class SftpExplorer extends StatelessWidget {
               itemBuilder: (context, index) {
                 final dirEntry = sftpProvider.dirContents[index];
                 return ListTile(
-                  leading: Icon(dirEntry.attr.isDirectory ? Icons.folder : Icons.description),
+                  leading: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    spacing: 10,
+                    children: [
+                      if (sftpProvider.isSelectionMode)
+                      Icon(sftpProvider.selectedFiles.contains(dirEntry) ? Icons.check_box : Icons.check_box_outline_blank),
+                      Icon(dirEntry.attr.isDirectory ? Icons.folder : Icons.description),
+                    ],
+                  ),
                   title: Text(dirEntry.filename),
-                  trailing: OperationButtons(dirEntries: [dirEntry],),
+                  trailing: sftpProvider.isSelectionMode ? null : OperationButtons(dirEntries: [dirEntry],),
                   onTap: () {
-                    if (dirEntry.attr.isDirectory) {
+                    if (sftpProvider.isSelectionMode) {
+                      sftpProvider.toggleSelection(dirEntry);
+                    }
+                    else if (dirEntry.attr.isDirectory) {
                       sftpProvider.goToDir('${sftpProvider.path}${dirEntry.filename}/');
                     }
+                  },
+                  onLongPress: () {
+                    sftpProvider.selectFile(dirEntry);
                   },
                 );
               }, 
@@ -168,11 +184,11 @@ class SftpExplorer extends StatelessWidget {
   }
 
   Widget _buildCopyMoveButton(BuildContext context) {
-    return Selector<SftpLoadingProvider, (List<String>?, bool)>(
-      selector: (_, sftpLoadingProvider) => (sftpLoadingProvider.toBeMovedOrCopied, sftpLoadingProvider.isCopy),
+    return Selector<SftpLoadingProvider, (double?, List<String>?, bool)>(
+      selector: (_, sftpLoadingProvider) => (sftpLoadingProvider.copyProgress, sftpLoadingProvider.toBeMovedOrCopied, sftpLoadingProvider.isCopy),
       builder: (_, data, __) {
-        final (toBeMovedOrCopied, isCopy) = data;
-        if (toBeMovedOrCopied == null) {
+        final (copyProgress, toBeMovedOrCopied, isCopy) = data;
+        if (toBeMovedOrCopied == null || copyProgress != null) {
           return const SizedBox.shrink();
         }
         return Padding(
@@ -202,7 +218,6 @@ class SftpExplorer extends StatelessWidget {
                       }
                     }
                   }
-                  // TODO: figure out where to put this line
                   sftpLoadingProvider.setCopyOrMoveFiles(null, isCopy);
                   sftpLoadingProvider.setCopyProgress(null);
                   sftpProvider.listDir();
@@ -236,20 +251,35 @@ class SftpExplorer extends StatelessWidget {
     );
   }
 
-  List<Widget> get _buildLoadingButtons => [
-    Selector<SftpLoadingProvider, double?>(
-      selector: (_, sftpLoadingProvider) => sftpLoadingProvider.uploadProgress,
-      builder: (_, uploadProgress, __) => _buildLoader(uploadProgress, Icons.upload)
-    ),
-    Selector<SftpLoadingProvider, double?>(
-      selector: (_, sftpLoadingProvider) => sftpLoadingProvider.downloadProgress,
-      builder: (_, downloadProgress, __) => _buildLoader(downloadProgress, Icons.download)
-    ),
-    Selector<SftpLoadingProvider, double?>(
-      selector: (_, sftpLoadingProvider) => sftpLoadingProvider.copyProgress,
-      builder: (_, copyProgress, __) => _buildLoader(copyProgress, Icons.copy)
-    ),
-  ];
+  Widget _buildAppBarButtons() {
+    return Selector<SftpProvider, bool>(
+      selector: (_, sftpProvider) => sftpProvider.isSelectionMode,
+      builder: (context, isSelectionMode, __) => 
+        isSelectionMode ? 
+        Selector<SftpProvider, List<SftpName>>(
+          selector: (_, sftpProvider) => sftpProvider.selectedFiles,
+          shouldRebuild: (prev, next) => listEquals(prev, next),
+          builder: (_, selectedFiles, __) => OperationButtons(dirEntries: [...selectedFiles])
+        )
+        : Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Selector<SftpLoadingProvider, double?>(
+            selector: (_, sftpLoadingProvider) => sftpLoadingProvider.uploadProgress,
+            builder: (_, uploadProgress, __) => _buildLoader(uploadProgress, Icons.upload)
+          ),
+          Selector<SftpLoadingProvider, double?>(
+            selector: (_, sftpLoadingProvider) => sftpLoadingProvider.downloadProgress,
+            builder: (_, downloadProgress, __) => _buildLoader(downloadProgress, Icons.download)
+          ),
+          Selector<SftpLoadingProvider, double?>(
+            selector: (_, sftpLoadingProvider) => sftpLoadingProvider.copyProgress,
+            builder: (_, copyProgress, __) => _buildLoader(copyProgress, Icons.copy)
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildLoader(double? progress, IconData icon) {
     return progress != null ? Stack(

@@ -185,8 +185,7 @@ class SftpWorker {
         final dstFile = await sftpClient.open(copyCmd.copyToPath, mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.exclusive);
         final fileSize = (await srcFile.stat()).size!;
         bool timeout = true;
-        await dstFile.write(
-          srcFile.read(),
+        await dstFile.write(srcFile.read(
           onProgress: (progress) {
             if (timeout) {
               timeout = false;
@@ -194,7 +193,7 @@ class SftpWorker {
               Future.delayed(Duration(seconds: 2), () => timeout = true);
             }
           }
-        );
+        ));
       }
       on SftpStatusError catch (e) {
         sendPort.send((id, RemoteError(e.message, '')));
